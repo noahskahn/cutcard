@@ -1,0 +1,89 @@
+# PROJECT_MAP — Cutcard (blackjack counting calculator)
+
+Static web app (no build step, no dependencies). ES modules + Web Workers + canvas charts.
+Run: `npm start` → http://localhost:8080 (or host the folder on any static host). Tests: `npm test`. Strategy cross-check: `npm run verify`.
+Use this file as context instead of reading all source.
+
+## Data flow (one paragraph)
+`config` (rules, table, player, costs, spread) → `compileSetup` builds strategy tables (engine) + active deviations →
+`Simulator.runBins` deals millions of flat-bet rounds in Web Workers and records, per **perceived true count bin**, `n, Σx, Σx²` →
+`binStats` smooths them (shrink toward linear fit) → `evaluateBets` turns any bet spread into EV/hr, SD, RoR, N0, hours-to-95% instantly →
+`optimizeSpread` finds the best ramp for a bankroll/RoR →
+`Simulator.runBankroll` (Monte Carlo, workers) validates with real dealt-card bankroll paths → `aggregateRuns` → charts.
+
+## Root
+| File | Purpose |
+|---|---|
+| `index.html` | App shell: header (accuracy, status, Share, Tools menu), `<main>` for the dashboard, modal container for tools. |
+| `package.json` | `type: module`; scripts `start`, `test`, `verify`. |
+| `README.md` | User/dev quick start & deploy notes. |
+| `PROJECT_MAP.md` | This file. |
+| `docs/STRATEGY_SOURCES.md` | How strategy/deviation/house-edge numbers were verified. |
+| `.claude/launch.json` | Dev-server config for the Claude desktop preview. |
+
+## `assets/` (solid-colour 2D SVGs)
+`logo.svg`, `favicon.svg`, `suit-*.svg`, `chip.svg`, `card-back.svg`, `icon-*.svg`.
+
+## `css/style.css`
+Whole dark theme (CSS variables at top), cards, forms, tables, strategy chart colours, responsive rules.
+
+## `src/core/` — config & rules (no DOM)
+| File | Purpose |
+|---|---|
+| `constants.js` | `ACT` action codes, Hi-Lo tag table, true-count bin range (`TC_MIN/TC_MAX/NBINS`). |
+| `rng.js` | Seedable fast PRNG (`makeRng`). |
+| `rules.js` | Defaults for rules/table/player/costs/spread, `canDouble`, `cutCard`, `validateConfig`, `simKey` (what invalidates cached simulation). |
+| `rulesParser.js` | Table-rules text syntax ⇄ rules (`parseRules`, `toRulesString`, `applyParsed`); also natural language. |
+| `presets.js` | 9 presets (Vegas strip, great 2D, single deck, 6:5 trap, CSM, ENHC…) → `configFromPreset`. |
+
+## `src/strategy/` — math engine (no DOM)
+| File | Purpose |
+|---|---|
+| `engine.js` | Dealer outcome distribution (exact, memoised, with card removal); hit/stand DP; `actionValues` = EV of stand/hit/double/split/surrender for a hand under a deck composition (handles peek/ENHC/OBO/early+late surrender, DAS, resplit limits, split aces); `countsAtTC` mean-field Hi-Lo composition. |
+| `basicStrategy.js` | `buildStrategy(rules, composition?)` → tables `initial/split/multi` (hard/soft/pair × upcard) with best action, 2nd-best (`*Alt`, used for mistakes) and display fallback (`*Fb`). `cellCode` for charts. |
+| `houseEdge.js` | `strategyEV`: exact EV per round of following the tables from a composition (house edge). |
+| `deviations.js` | Published I18 + Fab 4 (`PUBLISHED`), engine-derived indices (`deriveIndices`), insurance crossing, `compileDeviations` (filters by rule applicability & user toggles). |
+
+## `src/sim/` — Monte Carlo (no DOM)
+| File | Purpose |
+|---|---|
+| `simulator.js` | `Simulator`: lazy-Fisher-Yates shoe, cut card, full round (others, peek, insurance, splits, doubles, surrender, dealer play, settlement, commission), perceived true count (rounding, deck resolution, count-error drift), deviations, mistakes. `runBins` (flat bet stats by TC) and `runBankroll` (spread-driven bankroll walks). |
+| `compile.js` | `compileSetup(cfg, derived)` → serialisable setup passed to workers. |
+| `worker.js` | Web Worker entry running `bins`/`bankroll` tasks. |
+| `pool.js` | `SimPool`: splits jobs over `hardwareConcurrency` workers, merges, progress, cancel, inline fallback. |
+
+## `src/analysis/` — turns simulation into decisions (no DOM)
+| File | Purpose |
+|---|---|
+| `stats.js` | `mergeBins`, `binStats` (per-TC f, μ, E[x²], shrinkage to linear fit, slope). |
+| `spread.js` | Spread presets, `betsFromSpread` ($ per TC bin w/ limits/wong-out), `evaluateBets` (EV/hr, SD, RoR, N0, n95, costs, comps), ruin & trip-ruin formulas. |
+| `optimizer.js` | `optimizeSpread`: Kelly-proportional ramp scaled to a RoR target (grid search over scale and min bet); `rampToSpread`. |
+| `runStats.js` | `aggregateRuns`: mean, SD, percentiles, cumulative ruin from Monte Carlo matrices. |
+
+## `src/ui/` — browser UI
+| File | Purpose |
+|---|---|
+| `app.js` | Entry. Shared `app` state (config, persistence in localStorage + share link `#c=`), debounced `recompute()`. Home page = dashboard; every other module is a **tool** opened in a modal from the header **Tools ▾** menu (`TOOLS` list, `show(id)`, `show('home')` closes). |
+| `dom.js` | `h()` element builder, number formatters, path helpers. |
+| `fields.js` | Declarative inputs bound to config paths (`makeField`, `card`). |
+| `charts.js` | Canvas line/band charts with hover, bar charts, histogram. |
+| `tabs/dashboard.js` | **Home page (no scrolling)**: left = preset + key rules, bet spread, skill (deviation set, count-slip & mistake sliders), bankroll; right = verdict sentence, 5 KPIs, bankroll-over-time fan (theory ±1σ/±2σ, "Verify with dealt cards" overlays 300 dealt-card runs) and edge/profit/bets-by-true-count chart. Links to the tools below for advanced settings. |
+| `tabs/game.js` | Presets, rules, table & pace, costs/rake/comps, copy/paste rules. |
+| `tabs/player.js` | Deviation set, TC rounding, deck estimation, count-error & mistake rates, bankroll, back-counting, per-deviation toggles. |
+| `tabs/results.js` | Spread editor, metrics, spread comparison, EV-by-TC charts, sanity checks. |
+| `tabs/simulate.js` | Monte Carlo bankroll runs: paths + ±1σ/2σ, percentile fan, final histogram, ruin curve vs formula. |
+| `tabs/ideal.js` | Optimal spread for bankroll & RoR, bankroll tiers table, "use this spread". |
+| `tabs/whatif.js` | Sweep one factor (count error, mistakes, penetration, deviations, decks, players, resolution). |
+| `tabs/strategy.js` | Generated charts with deviation index tags. |
+| `tabs/help.js` | Quick start, glossary, syntax, method, limits. |
+
+## `tests/` (`npm test`, Node ≥ 18)
+`parser.test.js` rules text; `strategy.test.js` charts vs published, house edges, indices vs engine; `sim.test.js` simulator vs exact EV, effect of errors/mistakes, MC vs analytic.
+
+## `scripts/`
+`serve.mjs` static server · `verify-strategy.mjs` published-vs-engine index table · `he.mjs` house edges · `quick.mjs` print a chart · `simcheck.mjs`, `analysis-check.mjs` ad-hoc checks.
+
+## Extending
+* New rule: add to `defaultRules`, handle in `engine.js` (`actionValues`) AND `simulator.js`, add a field in `tabs/game.js`, token in `rulesParser.js`, test in `tests/`.
+* New counting system: add tag table in `constants.js`, thread through `simulator.js` (`HI_LO`) and `countsAtTC`; indices must be regenerated (engine set).
+* Anything that changes round play must be in `simKey` (rules.js) so statistics refresh.

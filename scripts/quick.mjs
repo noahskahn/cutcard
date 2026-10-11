@@ -1,0 +1,10 @@
+import { defaultRules } from '../src/core/rules.js';
+import { buildStrategy, cellCode } from '../src/strategy/basicStrategy.js';
+const rules = { ...defaultRules(), ...(process.argv[2] ? JSON.parse(process.argv[2]) : {}) };
+const t0 = Date.now();
+const S = buildStrategy(rules);
+console.log('build ms', Date.now() - t0);
+const row = (kind, keys, lab) => { console.log('\n' + lab + '      A  2  3  4  5  6  7  8  9  T'); for (const k of keys) { let s = String(k).padStart(2) + '       '; for (const u of [1,2,3,4,5,6,7,8,9,10]) s += cellCode(S.initial, kind, k, u).padEnd(3); console.log(s); } };
+row('hard', [8,9,10,11,12,13,14,15,16,17], 'HARD');
+row('soft', [13,14,15,16,17,18,19,20], 'SOFT');
+row('pair', [1,2,3,4,5,6,7,8,9,10], 'PAIR');
