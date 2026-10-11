@@ -13,6 +13,9 @@ Advantage-play analytics for blackjack. Model any rule set, count with Hi-Lo and
 - **Monte Carlo:** thousands of dealt-card bankroll runs with ±1σ/±2σ bands, percentile fans and ruin curves.
 - **Ideal bets:** Kelly-proportional ramp scaled to a target risk of ruin for any bankroll.
 
+## Trainer
+A separate **Trainer** view with a semi-3D table: *Keep the count* (Hi-Lo quizzes at configurable moments, running or true count), *Basic strategy* (camera swoops in; every play is graded with its EV cost; drill hard/soft/pairs/doubles/surrender spots), and *Count + deviations* (play Illustrious 18 / Fab 4 / engine indices from your own count). Deal speed, quiz cadence, training wheels (show count, +1/0/−1 tags) and table size are adjustable. Rendering uses CSS 3D transforms only (no WebGL, no per-frame JavaScript).
+
 ## Verification
 Basic strategy and house edges match published references (Wizard of Odds); simulation agrees with the exact engine; published indices are reproduced independently by the engine within ±1. Details: [docs/STRATEGY_SOURCES.md](docs/STRATEGY_SOURCES.md). Run `npm test`.
 

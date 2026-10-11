@@ -53,6 +53,7 @@ export const app = {
   change(path) {
     this.save(); this.syncFields();
     this.emit('cfg');
+    if (this.trainerActive) { this.dirty = true; return; }
     const light = /^(spread|player\.(bankroll|wongOutBelow)|table\.(roundsPerHour|increment)|costs\.(hourlyCost|rakePerHand|compPct))/.test(path);
     if (light && simKey(this.cfg) === this.lastKey) { this.emit('analysis'); return; }
     this.scheduleRecompute();
@@ -154,4 +155,28 @@ try { const a = localStorage.getItem('cutcard.acc'); if (a && ACCURACY[a]) app.u
 accSel.value = app.ui.accuracy;
 accSel.addEventListener('change', () => { app.ui.accuracy = accSel.value; try { localStorage.setItem('cutcard.acc', accSel.value); } catch (e) { /* ignore */ } app.recompute(); });
 app.recompute();
+
+// ---- Analyzer / Trainer view switch (trainer loads lazily; analyzer work pauses while training)
+let trainerApi = null;
+async function setView(v) {
+  const tr = v === 'trainer';
+  document.body.classList.toggle('view-trainer', tr);
+  document.getElementById('vAn').classList.toggle('on', !tr);
+  document.getElementById('vTr').classList.toggle('on', tr);
+  app.trainerActive = tr;
+  if (tr) {
+    closeTool();
+    if (app.busy) { app.pool.cancel(); app.seq++; app.setBusy(false); app.dirty = true; }
+    if (!trainerApi) { const m = await import('../trainer/ui.js'); trainerApi = m.mountTrainer(document.getElementById('trainer'), app); }
+    trainerApi.show();
+  } else {
+    if (trainerApi) trainerApi.hide();
+    if (app.dirty || !app.stats) { app.dirty = false; app.recompute(); }
+    window.dispatchEvent(new Event('resize'));
+  }
+  try { localStorage.setItem('cutcard.view', v); } catch (e) { /* ignore */ }
+}
+document.getElementById('vAn').addEventListener('click', () => setView('analyzer'));
+document.getElementById('vTr').addEventListener('click', () => setView('trainer'));
+if (location.hash.includes('trainer')) setView('trainer');
 window.app = app; // handy for debugging in devtools

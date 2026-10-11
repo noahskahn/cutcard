@@ -7,17 +7,20 @@
 <meta name="description" content="Blackjack card counting calculator: custom rules, bet spreads, EV, risk of ruin and Monte Carlo bankroll simulations.">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/trainer.css">
 </head>
 <body>
 <header class="top">
   <div class="brand"><img src="assets/logo.svg" alt="" width="34" height="34"><div><b>Cutcard</b><span>Advantage-play analytics</span></div></div>
+  <div class="viewnav"><button id="vAn" class="on">Analyzer</button><button id="vTr">Trainer</button></div>
   <div class="grow"></div>
-  <label class="acc" title="Rounds simulated per game setup. Higher = smoother statistics, slower.">Accuracy <select id="accuracy"><option value="quick">Quick (1M)</option><option value="standard">Standard (4M)</option><option value="high">High (20M)</option></select></label>
-  <div class="status" id="status"><span class="dot"></span><span id="statusText">Ready</span></div>
-  <button class="btn small" id="shareBtn" title="Copy a link to this exact setup">Share</button>
-  <div class="menuwrap"><button class="btn small primary" id="toolsBtn">Tools &#9662;</button><div class="menu" id="toolsMenu"></div></div>
+  <label class="acc an-only" title="Rounds simulated per game setup. Higher = smoother statistics, slower.">Accuracy <select id="accuracy"><option value="quick">Quick (1M)</option><option value="standard">Standard (4M)</option><option value="high">High (20M)</option></select></label>
+  <div class="status an-only" id="status"><span class="dot"></span><span id="statusText">Ready</span></div>
+  <button class="btn small an-only" id="shareBtn" title="Copy a link to this exact setup">Share</button>
+  <div class="menuwrap an-only"><button class="btn small primary" id="toolsBtn">Tools &#9662;</button><div class="menu" id="toolsMenu"></div></div>
 </header>
 <main id="main"></main>
+<div id="trainer"></div>
 <div class="modal" id="modal" hidden><div class="mpanel"><div class="mhead"><b id="mtitle"></b><button class="btn small" id="mclose">Close ✕</button></div><div class="mbody" id="mbody"></div></div></div>
 <script type="module" src="src/ui/app.js"></script>
 </body>

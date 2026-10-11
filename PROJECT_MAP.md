@@ -77,8 +77,18 @@ Whole dark theme (CSS variables at top), cards, forms, tables, strategy chart co
 | `tabs/strategy.js` | Generated charts with deviation index tags. |
 | `tabs/help.js` | Quick start, glossary, syntax, method, limits. |
 
+## `src/trainer/` — Trainer (separate view, header switch Analyzer | Trainer; lazy-loaded)
+| File | Purpose |
+|---|---|
+| `shoe.js` | Trainer shoe: lazy shuffle, running count, decks-left estimate, floored true count, rigged draws for drills. |
+| `advisor.js` | Correct-play oracle built on `strategy/` (generated basic strategy for the user's rules + I18/Fab4/engine deviations), legality, hand descriptions, EV cost of mistakes. |
+| `scene.js` | Semi-3D table in pure CSS 3D (perspective plane, rim, felt, vignette); cards, chips, pills, count tags; camera presets (`wide`, `mid`, `close`); all motion via transform/opacity (Web Animations API) so it stays GPU-cheap. |
+| `session.js` | Game flow (deal order, peek, insurance, split/double/surrender, dealer play, settlement), three modes (count / strategy / both), count quizzes (running/true), scoring, mistake log. |
+| `ui.js` | Mode bar, stats, dock (action buttons, quiz inputs, feedback), settings drawer (speed, quiz cadence, drills, training wheels, table rules shared with Analyzer), session review. |
+| `css/trainer.css` | Table, cards, HUD styling. |
+
 ## `tests/` (`npm test`, Node ≥ 18)
-`parser.test.js` rules text; `strategy.test.js` charts vs published, house edges, indices vs engine; `sim.test.js` simulator vs exact EV, effect of errors/mistakes, MC vs analytic.
+`trainer.test.js` advisor/shoe; `parser.test.js` rules text; `strategy.test.js` charts vs published, house edges, indices vs engine; `sim.test.js` simulator vs exact EV, effect of errors/mistakes, MC vs analytic.
 
 ## `scripts/`
 `serve.mjs` static server · `verify-strategy.mjs` published-vs-engine index table · `he.mjs` house edges · `quick.mjs` print a chart · `simcheck.mjs`, `analysis-check.mjs` ad-hoc checks.
