@@ -59,7 +59,7 @@ export function mount(root, app) {
     h('section', { class: 'blk' }, h('h4', {}, '2 · Bet spread ', h('small', {}, 'units bet at each true count')),
       h('div', { class: 'row', style: { marginBottom: '6px' } }, h('label', { class: 'u' }, '1 unit = $'), unitIn, spreadBtns), sp),
     h('section', { class: 'blk' }, h('h4', {}, '3 · Your skill'),
-      F({ path: 'player.deviations', label: 'Plays', type: 'select', options: [['none', 'Basic strategy only'], ['insurance', '+ insurance'], ['i18', '+ Illustrious 18'], ['i18fab4', '+ I18 & Fab 4'], ['engine', 'Everything (engine set)']] }),
+      F({ path: 'player.deviations', label: 'Plays', type: 'select', options: [['none', 'Basic strategy only'], ['insurance', '+ insurance'], ['i18', '+ Illustrious 18'], ['i18fab4', '+ I18 & Fab 4'], ['full', '+ extended chart set'], ['engine', 'Everything (engine set)']] }),
       h('div', { class: 'two' }, slider('player.countErrorRate', 'Count slips / round', 20, 0.5, 'Chance each round your running count slips by ±1'),
         slider('player.mistakeRate', 'Wrong plays / decision', 20, 0.5, 'Chance you play the wrong move')),
       h('button', { class: 'link', onclick: () => app.show('player') }, 'More skill settings →')),

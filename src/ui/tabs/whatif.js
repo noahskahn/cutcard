@@ -11,7 +11,7 @@ const SWEEPS = {
   count: { label: 'Running-count error rate', path: 'player.countErrorRate', values: [0, 0.01, 0.02, 0.05, 0.1, 0.2], f: (v) => fmt.pct(v, 0) + ' of rounds', parse: (s) => +s / 100, show: (v) => v * 100 },
   mistake: { label: 'Basic-strategy mistake rate', path: 'player.mistakeRate', values: [0, 0.01, 0.02, 0.05, 0.1, 0.2], f: (v) => fmt.pct(v, 0) + ' of decisions', parse: (s) => +s / 100, show: (v) => v * 100 },
   pen: { label: 'Penetration', path: 'rules.penetration', values: [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9], f: (v) => fmt.pct(v, 0), parse: (s) => +s / 100, show: (v) => v * 100 },
-  dev: { label: 'Deviation set', path: 'player.deviations', values: ['none', 'insurance', 'i18', 'i18fab4', 'engine'], f: (v) => ({ none: 'Basic only', insurance: 'Insurance only', i18: 'Illustrious 18', i18fab4: 'I18 + Fab 4', engine: 'Engine full set' }[v]), parse: (s) => s.trim(), show: (v) => v },
+  dev: { label: 'Deviation set', path: 'player.deviations', values: ['none', 'insurance', 'i18', 'i18fab4', 'full', 'engine'], f: (v) => ({ none: 'Basic only', insurance: 'Insurance only', i18: 'Illustrious 18', i18fab4: 'I18 + Fab 4', full: 'Extended published', engine: 'Engine full set' }[v]), parse: (s) => s.trim(), show: (v) => v },
   decks: { label: 'Number of decks', path: 'rules.decks', values: [1, 2, 4, 6, 8], f: (v) => v + ' decks', parse: (s) => +s, show: (v) => v },
   players: { label: 'Other players at table', path: 'table.otherPlayers', values: [0, 1, 2, 3, 5], f: (v) => v + ' others', parse: (s) => +s, show: (v) => v },
   res: { label: 'Deck-estimation resolution', path: 'player.deckResolution', values: [0, 0.25, 0.5, 1], f: (v) => (v === 0 ? 'Exact' : v + ' deck'), parse: (s) => +s, show: (v) => v },

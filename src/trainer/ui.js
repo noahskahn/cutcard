@@ -168,7 +168,7 @@ export function mountTrainer(root, app) {
       frow('True-count tolerance', sel('tol', [[0.5, '± 0.5'], [1, '± 1'], [2, '± 2']])),
       h('h5', {}, 'Play drills'),
       frow('Hand focus', sel('focus', [['all', 'Everything'], ['hard', 'Hard totals'], ['soft', 'Soft hands'], ['pairs', 'Pairs'], ['double', 'Double-down spots'], ['surrender', 'Surrender spots']])),
-      frow('Index plays', sel('devSet', [['i18fab4', 'Illustrious 18 + Fab 4'], ['i18', 'Illustrious 18'], ['engine', 'Full engine set']], restart), 'Used in "Count + deviations".'),
+      frow('Index plays', sel('devSet', [['i18fab4', 'Illustrious 18 + Fab 4'], ['i18', 'Illustrious 18'], ['full', 'Extended published set'], ['engine', 'Full engine set']], restart), 'Used in "Count + deviations".'),
       frow('Hand labels', tog('showLabels')),
       h('h5', {}, 'Training wheels'),
       frow('Show running count', tog('showCount', () => ui.updateCount(session.shoe || { rc: 0, decksEst: 1, tcFloor: 0 }))),

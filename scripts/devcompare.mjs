@@ -7,7 +7,7 @@ import { betsFromSpread, evaluateBets } from '../src/analysis/spread.js';
 import { deriveIndices } from '../src/strategy/deviations.js';
 const id = process.argv[2] || 'solid-6d', N = +(process.argv[3] || 30e6);
 const base = configFromPreset(id); const derived = deriveIndices(base.rules);
-for (const mode of ['none', 'insurance', 'i18', 'i18fab4', 'engine']) {
+for (const mode of ['none', 'insurance', 'i18', 'i18fab4', 'full', 'engine']) {
   const cfg = JSON.parse(JSON.stringify(base)); cfg.player.deviations = mode;
   const setup = compileSetup(cfg, derived);
   const st = binStats(new Simulator(setup, 77).runBins(N));

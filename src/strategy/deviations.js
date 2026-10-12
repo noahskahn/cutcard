@@ -13,8 +13,8 @@ import { countsAtTC, bestAction } from './engine.js';
 const A = ACT;
 // baseSide: which of above/below the *basic strategy* normally is (used to reject entries
 // that don't apply under the user's rules).
-const P = (set, kind, key, up, idx, above, below, baseSide = 'below') =>
-  ({ set, kind, key, up, idx, above, below, baseSide, source: 'published' });
+const P = (set, kind, key, up, idx, above, below, baseSide = 'below', h17) =>
+  ({ set, kind, key, up, idx, above, below, baseSide, source: 'published', ...(h17 === undefined ? {} : { h17 }) });
 
 export const PUBLISHED = [
   P('i18', 'hard', 16, 10, 0, A.STAND, A.HIT),
@@ -39,6 +39,25 @@ export const PUBLISHED = [
   P('fab4', 'hard', 15, 10, 0, A.SURRENDER, A.HIT, 'above'),
   P('fab4', 'hard', 15, 9, 2, A.SURRENDER, A.HIT),
   P('fab4', 'hard', 15, 1, 1, A.SURRENDER, A.HIT),
+];
+
+// Extra published plays (set 'ext') from a Hi-Lo H17 / late-surrender index chart. Entries tagged
+// h17 only apply to (and override the generic I18 value in) games with that dealer rule.
+export const EXTRA = [
+  P('ext', 'pair', 10, 4, 6, A.SPLIT, A.STAND),
+  P('ext', 'soft', 19, 4, 3, A.DOUBLE, A.STAND),   // A,8 v4
+  P('ext', 'soft', 19, 5, 1, A.DOUBLE, A.STAND),   // A,8 v5
+  P('ext', 'soft', 19, 6, 0, A.DOUBLE, A.STAND, 'below', false), // A,8 v6 (basic strategy stands only under S17)
+  P('ext', 'soft', 17, 2, 1, A.DOUBLE, A.HIT),     // A,6 v2
+  P('ext', 'hard', 8, 6, 2, A.DOUBLE, A.HIT),
+  { ...P('ext', 'hard', 15, 1, 5, A.STAND, A.HIT), noSur: true },   // 15 vs A stand (games without surrender)
+  { ...P('ext', 'hard', 16, 1, 3, A.STAND, A.HIT), noSur: true },   // 16 vs A stand (games without surrender)
+  P('ext', 'hard', 16, 8, 4, A.SURRENDER, A.HIT),
+  P('ext', 'hard', 16, 9, -1, A.SURRENDER, A.HIT, 'above'),
+  // H17-specific values from the same chart
+  P('ext', 'hard', 16, 9, 4, A.STAND, A.HIT, 'below', true),
+  P('ext', 'hard', 10, 1, 3, A.DOUBLE, A.HIT, 'below', true),
+  P('ext', 'hard', 15, 1, -1, A.SURRENDER, A.HIT, 'above', true),
 ];
 export const INSURANCE_INDEX = 3;
 
@@ -112,6 +131,7 @@ export function deriveIndices(rules, { range = 10 } = {}) {
 
 /** Is a deviation usable under the rules / current basic strategy? */
 function usable(d, rules, strategy) {
+  if (d.noSur && rules.surrender !== 'none') return false;
   if ((d.above === ACT.SURRENDER || d.below === ACT.SURRENDER) && rules.surrender === 'none') return false;
   const base = tableOf(strategy, d.kind)[tableIndex(d.key, d.up)];
   return d.baseSide === 'below' ? base === d.below : base === d.above;
@@ -132,10 +152,20 @@ export function compileDeviations(rules, strategy, player, derived) {
   let src;
   if (mode === 'engine') {
     src = (derived || []).map((d) => ({ ...d, idx: indexFromCrossing(d.tStar, player.tcRounding) }));
+  } else if (mode === 'full') {
+    src = [...PUBLISHED, ...EXTRA];
   } else {
     src = PUBLISHED.filter((d) => mode === 'i18fab4' || d.set === 'i18');
   }
+  // rule-tagged entries apply only under matching dealer rule and override generic duplicates
+  src = src.filter((d) => d.h17 === undefined || d.h17 === rules.h17);
+  const pick = new Map();
   for (const d of src) {
+    const id = `${devKey(d)}|${d.baseSide}|${d.above}`;
+    const cur = pick.get(id);
+    if (!cur || (d.h17 !== undefined && cur.h17 === undefined)) pick.set(id, d);
+  }
+  for (const d of pick.values()) {
     if (!usable(d, rules, strategy)) continue;
     const k = devKey(d);
     if (disabled.has(k)) continue;

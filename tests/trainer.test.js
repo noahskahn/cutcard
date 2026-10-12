@@ -42,3 +42,21 @@ test('shoe counts and shuffles', () => {
   assert.equal(s.drawValue(7), 7);
   s.shuffle(); assert.equal(s.rc, 0);
 });
+
+test('extended published set: rule-aware and conflict-free', async () => {
+  const { compileDeviations } = await import('../src/strategy/deviations.js');
+  const { buildStrategy } = await import('../src/strategy/basicStrategy.js');
+  const mk = (o) => { const r = { ...defaultRules(), ...o }; return compileDeviations(r, buildStrategy(r), { deviations: 'full', disabledDeviations: [], tcRounding: 'floor' }); };
+  const find = (c, k) => c.list.find((d) => d.k === k);
+  const s17 = mk({}), h17ls = mk({ h17: true, surrender: 'late' }), s17ls = mk({ surrender: 'late' });
+  assert.ok(s17.list.length > 18);
+  assert.equal(find(s17, 'hard:16:9').idx, 5);        // generic I18 value under S17
+  assert.equal(find(mk({ h17: true }), 'hard:16:9').idx, 4); // chart value under H17
+  assert.equal(find(s17, 'hard:15:1').idx, 5);        // stand 15 vs A without surrender
+  assert.equal(find(s17ls, 'hard:15:1').above, ACT.SURRENDER); // with surrender, surrender index wins
+  assert.equal(find(h17ls, 'hard:15:1').idx, -1);
+  const keys = s17ls.list.map((d) => d.k); assert.equal(new Set(keys).size, keys.length, 'one play per cell');
+  const a = new Advisor({ ...defaultRules() }, 'full');
+  assert.equal(a.advise(H(1, 8), 5, 1, 1, true).action, ACT.DOUBLE);
+  assert.equal(a.advise(H(1, 8), 5, 1, 0, true).action, ACT.STAND);
+});

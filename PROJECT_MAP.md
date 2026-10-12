@@ -42,7 +42,7 @@ Whole dark theme (CSS variables at top), cards, forms, tables, strategy chart co
 | `engine.js` | Dealer outcome distribution (exact, memoised, with card removal); hit/stand DP; `actionValues` = EV of stand/hit/double/split/surrender for a hand under a deck composition (handles peek/ENHC/OBO/early+late surrender, DAS, resplit limits, split aces); `countsAtTC` mean-field Hi-Lo composition. |
 | `basicStrategy.js` | `buildStrategy(rules, composition?)` → tables `initial/split/multi` (hard/soft/pair × upcard) with best action, 2nd-best (`*Alt`, used for mistakes) and display fallback (`*Fb`). `cellCode` for charts. |
 | `houseEdge.js` | `strategyEV`: exact EV per round of following the tables from a composition (house edge). |
-| `deviations.js` | Published I18 + Fab 4 (`PUBLISHED`), engine-derived indices (`deriveIndices`), insurance crossing, `compileDeviations` (filters by rule applicability & user toggles). |
+| `deviations.js` | Published I18 + Fab 4 (`PUBLISHED`), extended chart set (`EXTRA`, rule-tagged), engine-derived indices (`deriveIndices`), insurance crossing, `compileDeviations` (filters by rule applicability & user toggles). |
 
 ## `src/sim/` — Monte Carlo (no DOM)
 | File | Purpose |
@@ -91,7 +91,7 @@ Whole dark theme (CSS variables at top), cards, forms, tables, strategy chart co
 `trainer.test.js` advisor/shoe; `parser.test.js` rules text; `strategy.test.js` charts vs published, house edges, indices vs engine; `sim.test.js` simulator vs exact EV, effect of errors/mistakes, MC vs analytic.
 
 ## `scripts/`
-`serve.mjs` static server · `verify-strategy.mjs` published-vs-engine index table · `he.mjs` house edges · `quick.mjs` print a chart · `simcheck.mjs`, `analysis-check.mjs` ad-hoc checks.
+`verify-extra.mjs`/`devcompare.mjs`/`devablate.mjs`/`devone.mjs` deviation checks · `serve.mjs` static server · `verify-strategy.mjs` published-vs-engine index table · `he.mjs` house edges · `quick.mjs` print a chart · `simcheck.mjs`, `analysis-check.mjs` ad-hoc checks.
 
 ## Extending
 * New rule: add to `defaultRules`, handle in `engine.js` (`actionValues`) AND `simulator.js`, add a field in `tabs/game.js`, token in `rulesParser.js`, test in `tests/`.

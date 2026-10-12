@@ -36,7 +36,7 @@ export function mount(root, app) {
       card('Strategy', 'Basic strategy is generated from your exact rules (never a fixed chart).',
         F({ path: 'player.deviations', label: 'Count-based deviations', type: 'select', options: [
           ['none', 'None — perfect basic strategy only'], ['insurance', 'Insurance only'], ['i18', 'Illustrious 18'],
-          ['i18fab4', 'Illustrious 18 + Fab 4 surrenders'], ['engine', 'Full set derived by the engine (experimental)']],
+          ['i18fab4', 'Illustrious 18 + Fab 4 surrenders'], ['full', 'Extended published set (I18 + Fab 4 + more)'], ['engine', 'Full set derived by the engine (experimental)']],
           hint: 'Published sets are Hi-Lo indices (Schlesinger / Wong). "Engine" computes ~100+ indices for your exact rules.' }),
         F({ path: 'player.tcRounding', label: 'True-count rounding', type: 'select', options: [['floor', 'Round down (standard)'], ['round', 'Nearest'], ['none', 'No rounding']], hint: 'Published indices assume you round down.' }),
         F({ path: 'player.deckResolution', label: 'Deck-estimation resolution', type: 'select', options: [[0, 'Exact'], [0.25, 'Quarter deck'], [0.5, 'Half deck'], [1, 'Full deck']], hint: 'How precisely you judge the discard tray.' }),
