@@ -35,11 +35,10 @@ export function mountTrainer(root, app) {
   const logList = h('div', { class: 'tr-loglist' });
   const log = h('div', { class: 'tr-log', hidden: true }, h('div', { class: 'tr-loghead' }, h('b', {}, 'Decisions'), h('span', {}, 'newest first')), logList);
 
-  const brand = h('div', { class: 'tr-brand' }, h('img', { src: 'assets/logo.svg', width: 24, height: 24, alt: '' }), h('b', {}, 'CUTCARD'));
+  const brand = h('div', { class: 'tr-brand' }, h('img', { src: 'assets/logo.svg', width: 34, height: 34, alt: '' }), h('div', {}, h('b', {}, 'Cutcard'), h('span', {}, 'Advantage-play trainer')));
   const corner = h('div', { class: 'tr-corner' },
     h('button', { class: 'glass', onclick: () => openTutorial() }, 'Tutorial'),
-    h('button', { class: 'glass', onclick: () => drawer.classList.toggle('open') }, 'Settings'),
-    h('button', { class: 'glass accent', onclick: () => app.openEV() }, 'EV calculator ›'));
+    h('button', { class: 'glass', onclick: () => drawer.classList.toggle('open') }, 'Settings'));
 
   // stats bar (visible while training)
   const statAcc = h('b', {}, '—'), statPlay = h('b', {}, '—'), statStreak = h('b', {}, '0');
@@ -54,10 +53,11 @@ export function mountTrainer(root, app) {
 
   // launch panel (visible while idle)
   const modeCards = Object.entries(MODES).map(([k, m]) => h('button', { class: 'tr-mode', 'data-m': k, onclick: () => setMode(k) }, h('b', {}, m.title), h('span', {}, m.sub)));
+  const evCard = h('button', { class: 'tr-mode ev', onclick: () => app.openEV() }, h('b', {}, 'EV calculator'), h('span', {}, 'what is it worth? ›'));
   const desc = h('p', { class: 'tr-desc' });
   const opts = h('div', { class: 'tr-opts' });
   const hint = h('button', { class: 'tr-newhere', onclick: () => openTutorial() }, 'New here? Take the 2-minute tutorial →');
-  const launch = h('div', { class: 'tr-launch' }, hint, h('div', { class: 'tr-modes3' }, modeCards), desc, opts,
+  const launch = h('div', { class: 'tr-launch' }, hint, h('div', { class: 'tr-modes3' }, modeCards, evCard), desc, opts,
     h('button', { class: 'tr-go', onclick: () => begin() }, 'Start training'));
 
   root.append(h('div', { class: 'tr-body' }, stageEl, hud, log, brand, corner, statbar, dock, launch, drawer, review));
@@ -257,11 +257,11 @@ export function mountTrainer(root, app) {
     if (session.tk) { session.stop(); scene.clearInstant(); }
     drawer.classList.remove('open'); review.hidden = true; showIdle();
     root.classList.add('ev-mode'); stageEl.classList.remove('focus');
-    scene.camera('felt', 2200);                       // dive down into the felt
+    scene.camera('felt', 850);                        // dive down into the felt
   };
   app.onEVClose = () => {
     root.classList.remove('ev-mode');
-    session.layoutScene(); scene.camera(camFor(set.mode), 1900);
+    session.layoutScene(); scene.camera(camFor(set.mode), 1100);
   };
   app.getPerformance = () => {
     const s = session.stats;

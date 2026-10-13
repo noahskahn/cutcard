@@ -165,7 +165,7 @@ app.openEV = (opts = {}) => {
   evTimer = setTimeout(() => {
     evEl.classList.add('ready');
     if (app.dirty || !app.stats) { app.dirty = false; app.recompute(); } else { app.emit('analysis'); app.setBusy(false); }
-  }, 1500);
+  }, 620);
 };
 app.closeEV = () => {
   clearTimeout(evTimer); closeTool();
