@@ -1,1 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#141a22"/><rect x="14" y="10" width="26" height="38" rx="3.500" fill="#e8ecf1"/><rect x="14" y="30" width="36" height="9" rx="2" fill="#4cc9a0"/><path d="M44 30v9" stroke="#141a22" stroke-width="2"/><rect x="18" y="52" width="28" height="3" rx="1.500" fill="#2a3340"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <clipPath id="top"><polygon points="14,8 50,8 50,26 14,35"/></clipPath>
+    <clipPath id="bot"><polygon points="50,26 50,56 14,56 14,35"/></clipPath>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0b1417"/>
+  <g transform="translate(-2.5,-1.5)">
+    <rect x="14" y="8" width="36" height="48" rx="4" fill="#f1f4f2" clip-path="url(#top)"/>
+    <path d="M40 18.500a10 10 0 1 0 0 14" fill="none" stroke="#0b1417" stroke-width="5.500" stroke-linecap="round" clip-path="url(#top)"/>
+  </g>
+  <g transform="translate(2.5,1.5)">
+    <rect x="14" y="8" width="36" height="48" rx="4" fill="#4cc9a0" clip-path="url(#bot)"/>
+    <path d="M40 18.500a10 10 0 1 0 0 14" fill="none" stroke="#0b1417" stroke-width="5.500" stroke-linecap="round" clip-path="url(#bot)"/>
+  </g>
+</svg>

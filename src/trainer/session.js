@@ -62,7 +62,7 @@ export class Session {
 
   camera(phase, ms) {
     const m = this.set.mode;
-    const cam = m === 'count' ? 'wide' : m === 'strategy' ? 'close' : phase === 'decide' ? 'mid' : 'both';
+    const cam = m === 'count' ? 'wide' : m === 'strategy' ? 'close' : phase === 'decide' ? 'mid' : 'wide';
     this.scene.camera(cam, ms);
   }
 

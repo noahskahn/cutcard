@@ -16,7 +16,7 @@ const MODES = {
   both: { title: 'Count + play', sub: 'the real thing', desc: 'Keep the count from the wide view and make every play yourself — with index deviations if you like.' },
 };
 const ACTIONS = [[ACT.HIT, 'Hit', 'H', 'hit'], [ACT.STAND, 'Stand', 'S', 'stand'], [ACT.DOUBLE, 'Double', 'D', 'double'], [ACT.SPLIT, 'Split', 'P', 'split'], [ACT.SURRENDER, 'Surrender', 'R', 'surrender']];
-const camFor = (m) => (m === 'strategy' ? 'close' : m === 'both' ? 'both' : 'wide');
+const camFor = (m) => (m === 'strategy' ? 'close' : 'wide');
 
 export function mountTrainer(root, app) {
   let set = { ...DEFAULTS };
@@ -52,8 +52,8 @@ export function mountTrainer(root, app) {
     pauseBtn, h('button', { class: 'glass', onclick: () => endSession() }, 'End'));
 
   // launch panel (visible while idle)
-  const modeCards = Object.entries(MODES).map(([k, m]) => h('button', { class: 'tr-mode', 'data-m': k, onclick: () => setMode(k) }, h('b', {}, m.title), h('span', {}, m.sub)));
-  const evCard = h('button', { class: 'tr-mode ev', onclick: () => app.openEV() }, h('b', {}, 'EV calculator'), h('span', {}, 'what is it worth? ›'));
+  const modeCards = Object.entries(MODES).map(([k, m]) => h('button', { class: 'tr-mode', 'data-m': k, onclick: () => setMode(k) }, h('b', {}, m.title)));
+  const evCard = h('button', { class: 'tr-mode ev', onclick: () => app.openEV() }, h('b', {}, 'EV calculator'));
   const desc = h('p', { class: 'tr-desc' });
   const opts = h('div', { class: 'tr-opts' });
   const hint = h('button', { class: 'tr-newhere', onclick: () => openTutorial() }, 'New here? Take the 2-minute tutorial →');
@@ -145,7 +145,7 @@ export function mountTrainer(root, app) {
     set.mode = m; save(); markModes(); renderOpts(); showIdle(); session.applySpeed(); session.layoutScene();
     if (changed || was) scene.camera(camFor(m), 2000);   // camera glides to the new mode's view
   }
-  function markModes() { modeCards.forEach((b) => b.classList.toggle('on', b.dataset.m === set.mode)); desc.textContent = MODES[set.mode].desc; }
+  function markModes() { modeCards.forEach((b) => b.classList.toggle('on', b.dataset.m === set.mode)); desc.textContent = MODES[set.mode].desc; root.dataset.mode = set.mode; }
   function begin() {
     review.hidden = true; launch.hidden = true; statbar.hidden = false; logList.innerHTML = ''; log.hidden = false;
     modeLbl.textContent = MODES[set.mode].title;
@@ -197,7 +197,7 @@ export function mountTrainer(root, app) {
       h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '18px' } },
         h('button', { class: 'tr-go small', onclick: () => { review.hidden = true; scene.clearInstant(); begin(); } }, 'New session'),
         mistakeBank.count() ? h('button', { class: 'glass', onclick: () => { set.focus = 'mistakes'; save(); review.hidden = true; scene.clearInstant(); if (set.mode === 'count') setMode('strategy'); begin(); } }, `Drill my ${mistakeBank.count()} mistakes`) : null,
-        h('button', { class: 'glass', onclick: backToTable }, 'Back to table'),
+        h('button', { class: 'glass', onclick: backToTable }, '‹ Back to table'),
         h('button', { class: 'glass accent', onclick: () => { app.openEV({ fromSession: true }); } }, 'Calculate EV from my play ›'))));
   }
 
@@ -214,7 +214,7 @@ export function mountTrainer(root, app) {
     cps.addEventListener('input', () => { set.cps = +cps.value; cpsOut.textContent = set.cps + ' cards/s'; session.applySpeed(); });
     cps.addEventListener('change', save);
     const items = [
-      h('div', { class: 'row sp' }, h('b', {}, 'Settings'), h('button', { class: 'glass', onclick: () => drawer.classList.remove('open') }, 'Close')),
+      h('div', { class: 'row sp' }, h('b', {}, 'Settings'), h('button', { class: 'glass', onclick: () => drawer.classList.remove('open') }, '‹ Back')),
       h('h5', {}, 'Pace'), h('div', { class: 'row sp' }, h('label', {}, 'Dealing speed'), cpsOut), cps,
       h('h5', {}, 'Count quizzes'),
       frow('Ask', sel('quizFreq', [['round', 'End of every round'], ['cards', 'Every N cards'], ['random', 'Random moment each round']])),

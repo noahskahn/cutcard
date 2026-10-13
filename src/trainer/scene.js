@@ -10,7 +10,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export const CAMERAS = {
   wide:  { rx: 50, s: 0.9,  ty: -52 },
-  both:  { rx: 41, s: 1.0,  ty: -74, rz: -4.5 },   // Count + play: lower, rotated angle
   felt:  { rx: 5,  s: 2.35, ty: 14 },              // EV calculator: looking down into the felt
   mid:   { rx: 44, s: 1.05, ty: -30 },
   close: { rx: 34, s: 1.85, ty: -40 },

@@ -100,7 +100,7 @@ export function openTutorial(app, { startTraining }) {
   };
   const go = (n) => { step = Math.max(0, Math.min(steps.length - 1, n)); render(); };
   nxt.onclick = () => { if (step === steps.length - 1) { close(); startTraining(); } else go(step + 1); };
-  root.append(h('div', { class: 'tut-panel' }, h('div', { class: 'row sp' }, h('div', { class: 'tut-step' }, 'Tutorial'), h('button', { class: 'glass', onclick: close }, 'Skip')), title, body, dots,
+  root.append(h('div', { class: 'tut-panel' }, h('div', { class: 'row sp' }, h('div', { class: 'tut-step' }, 'Tutorial'), h('button', { class: 'glass', onclick: close }, '‹ Exit tutorial')), title, body, dots,
     h('div', { class: 'row sp', style: { marginTop: '14px' } }, back, h('div', { class: 'row' }, last, nxt))));
   root.onclick = (e) => { if (e.target === root) close(); };
   render();

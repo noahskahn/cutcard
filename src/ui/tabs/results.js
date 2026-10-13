@@ -83,7 +83,7 @@ export function mount(root, app) {
       hr.push(bets[i] * st.f[i] * st.mu[i] * rph);
       cols.push(st.n[i] < 3000 ? '#5d6c7b' : st.rawMu[i] >= 0 ? '#4cc9a0' : '#e5707a');
     }
-    barChart(cEV, { labels, values: vals, errs, colors: cols, line: { values: fit, color: '#d6a85a' }, yFmt: (v) => v.toFixed(1) + '%', xLabel: 'True count' });
+    barChart(cEV, { labels, values: vals, errs, colors: cols, line: { values: fit, color: '#bcd9cc' }, yFmt: (v) => v.toFixed(1) + '%', xLabel: 'True count' });
     barChart(cFreq, { labels, values: freq, colors: labels.map(() => '#6ea8e0'), yFmt: (v) => v.toFixed(0) + '%', xLabel: 'True count' });
     barChart(cHr, { labels, values: hr, yFmt: (v) => fmt.money(v, 0), xLabel: 'True count' });
     // sanity

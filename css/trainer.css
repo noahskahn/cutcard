@@ -259,3 +259,14 @@ body{background:#030507;overflow:hidden}
 .tr-mode.ev:hover{border-color:#e8d599;box-shadow:0 0 24px #e8d59926}
 .ev-mode .tr-modes3{display:none}
 @media (max-width:700px){.tr-modes3{grid-template-columns:1fr}}
+
+/* Count + play: glowing rim (same camera as counting) */
+.tr-root[data-mode="both"] .tr-wood{box-shadow:inset 0 3px 3px #9be7cb55,inset 0 -8px 16px #000a,0 0 38px #4cc9a066,0 0 90px #4cc9a033;transition:box-shadow .8s}
+.tr-root[data-mode="both"] .tr-rail{box-shadow:inset 0 2px 2px #ffffff22,inset 0 -6px 14px #000c,inset 0 0 26px #4cc9a044,0 2px 6px #0008;transition:box-shadow .8s}
+.tr-root[data-mode="both"] .tr-wood{background:linear-gradient(180deg,#3a6f60,#1e3d36 45%,#0f221d)}
+.tr-root[data-mode="both"] .tr-rail{background:linear-gradient(180deg,#1e2b28,#0d1412)}
+.ev-mode .tr-wood,.ev-mode .tr-rail{box-shadow:none}
+.tr-mode.ev{border-color:#ffffff30;background:#0b1217;color:var(--text)}
+.tr-mode.ev:hover{border-color:#4cc9a0;box-shadow:none}
+.tr-mode b{font-size:15px}
+.tr-mode{padding:13px 10px}

@@ -1,71 +1,33 @@
-// EV calculator, "printed on the felt": hero numbers + two charts; every input lives in small sub-tables.
-import { h, fmt, getPath, setPath } from './dom.js';
+// EV calculator, "set into the felt": three headline numbers + simulated bankroll lines.
+// Everything editable lives in the pop-up menu at the bottom (rules, spread, skill, bankroll, and the detailed tools).
+import { h, fmt, getPath, setPath, debounce } from './dom.js';
 import { makeField } from './fields.js';
-import { lineChart, barChart } from './charts.js';
+import { lineChart } from './charts.js';
 import { PRESETS, configFromPreset } from '../core/presets.js';
 import { SPREAD_PRESETS } from '../analysis/spread.js';
 import { aggregateRuns } from '../analysis/runStats.js';
+import { SimPool } from '../sim/pool.js';
 import { TC_MIN, NBINS } from '../core/constants.js';
+
+const MC_RUNS = 80, MC_SHOW = 16;
 
 export function mount(root, app) {
   const F = (s) => makeField(app, s);
-  const st = { hours: 200, view: 'profit', mc: null, mcBusy: false, open: null };
+  const st = { hours: 200, open: null, mc: null, mcSeq: 0, mcBusy: false };
+  const mcPool = new SimPool(Math.min(4, (navigator.hardwareConcurrency || 4)));
   root.innerHTML = '';
 
   // ---------- header
-  const status = h('span', { class: 'evf-status' }, h('i', { class: 'dot' }), h('span', { id: 'statusText' }, 'Ready'));
-  app.statusEl = status; app.statusTextEl = status.querySelector('span');
-  const useBtn = h('button', { class: 'glass', title: 'Fill in count slips and wrong-play rates from your last training session', onclick: () => app.applySession() }, 'Use my training performance');
-  app.evMsg = (m) => { useBtn.textContent = m; setTimeout(() => (useBtn.textContent = 'Use my training performance'), 2200); };
-  const menu = h('div', { class: 'evf-menu' });
-  const accSel = h('select', {}, [['quick', 'Quick (1M rounds)'], ['standard', 'Standard (4M)'], ['high', 'High (20M)']].map(([v, l]) => h('option', { value: v }, l)));
-  accSel.value = app.ui.accuracy;
-  accSel.addEventListener('change', () => { app.ui.accuracy = accSel.value; try { localStorage.setItem('cutcard.acc', accSel.value); } catch (e) { /* ignore */ } app.recompute(); });
-  const shareBtn = h('button', { onclick: async () => { try { await navigator.clipboard.writeText(app.shareLink()); shareBtn.textContent = 'Link copied ✓'; } catch (e) { shareBtn.textContent = 'Copy failed'; } setTimeout(() => (shareBtn.textContent = 'Copy share link'), 1800); } }, 'Copy share link');
-  menu.append(...app.tools.map(([id, title, , sub]) => h('button', { onclick: () => { menu.classList.remove('open'); app.show(id); } }, h('b', {}, title), h('small', {}, sub))),
-    h('div', { class: 'evf-menusep' }), h('label', { class: 'evf-menurow' }, 'Simulation accuracy', accSel), shareBtn);
-  const moreBtn = h('button', { class: 'glass', onclick: (e) => { e.stopPropagation(); menu.classList.toggle('open'); } }, 'More tools ▾');
-  document.addEventListener('click', () => menu.classList.remove('open'));
+  const status = h('span', { class: 'evf-status' }, h('i', { class: 'dot' }), h('span', {}, 'Ready'));
+  app.statusEl = status; app.statusTextEl = status.lastChild;
   const head = h('div', { class: 'evf-head' },
-    h('div', { class: 'evf-title' }, h('b', {}, 'EV CALCULATOR'), h('span', { id: 'evGame' })),
-    h('div', { class: 'grow' }), status, useBtn, h('div', { class: 'menuwrap' }, moreBtn, menu),
-    h('button', { class: 'glass accent', onclick: () => app.closeEV() }, '‹ Back to table'));
+    h('button', { class: 'glass', onclick: () => app.closeEV() }, '‹ Back to table'),
+    h('div', { class: 'evf-title' }, h('b', {}, 'EV CALCULATOR'), h('span', { id: 'evGame' })), h('div', { class: 'grow' }), status);
 
-  // ---------- hero + secondary metrics
-  const verdict = h('div', { class: 'evf-verdict' });
+  // ---------- left: headline numbers + simple setup
   const hero = h('div', { class: 'evf-hero' });
   const sec = h('div', { class: 'evf-sec' });
-
-  // ---------- charts
-  const fanC = h('canvas'), tcC = h('canvas');
-  const hoursIn = h('input', { type: 'range', min: 10, max: 1000, step: 10, value: st.hours, class: 'range' });
-  const hoursOut = h('b', {}, st.hours + ' h');
-  hoursIn.addEventListener('input', () => { st.hours = +hoursIn.value; hoursOut.textContent = st.hours + ' h'; st.mc = null; draw(); });
-  const mcNote = h('span', { class: 'evf-note' });
-  const mcBtn = h('button', { class: 'glass' }, 'Verify with dealt cards');
-  mcBtn.onclick = async () => {
-    if (!app.stats || st.mcBusy) return;
-    st.mcBusy = true; mcBtn.disabled = true;
-    const cfg = app.cfg, cur = app.evalCurrent(), rounds = Math.round(st.hours * cfg.table.roundsPerHour), cp = 60, runs = 300;
-    try {
-      const parts = await app.pool.runBankroll(app.setup || app.compile(), { runs, rounds, checkpoints: cp, bets: cur.bets, bankroll: cfg.player.bankroll, minBet: cfg.table.minBet,
-        perRoundCost: (cfg.costs.hourlyCost || 0) / cfg.table.roundsPerHour, rakePerHand: cfg.costs.rakePerHand || 0, compPct: (cfg.costs.compPct || 0) / 100 },
-      (p) => { mcBtn.textContent = `Simulating ${Math.round(p * 100)}%`; }, Date.now() % 100000);
-      st.mc = aggregateRuns(parts, runs, cp, rounds, cfg.player.bankroll); st.mcHours = st.hours;
-    } catch (e) { mcNote.textContent = 'Stopped.'; }
-    st.mcBusy = false; mcBtn.disabled = false; mcBtn.textContent = 'Verify with dealt cards'; draw();
-  };
-  const seg = h('div', { class: 'seg' }, ...[['profit', 'Profit by count'], ['edge', 'Edge by count'], ['bet', 'Your bets']].map(([k, l]) =>
-    h('button', { class: k === st.view ? 'on' : '', 'data-k': k, onclick: () => { st.view = k; seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.k === k)); draw(); } }, l)));
-  const tcNote = h('div', { class: 'evf-note' });
-  const charts = h('div', { class: 'evf-charts' },
-    h('div', { class: 'evf-card ch' }, h('div', { class: 'row sp' }, h('h3', {}, 'Bankroll over time'), h('div', { class: 'row' }, h('span', { class: 'evf-note' }, 'Horizon'), hoursIn, hoursOut)),
-      h('div', { class: 'cwrap' }, fanC),
-      h('div', { class: 'row sp' }, h('div', { class: 'legend' }, h('span', {}, h('i', { style: { background: '#f4efe0' } }), 'Expected'), h('span', {}, h('i', { style: { background: '#4cc9a0' } }), '68% range'), h('span', {}, h('i', { style: { background: '#4cc9a088' } }), '95% range')), h('div', { class: 'row' }, mcNote, mcBtn))),
-    h('div', { class: 'evf-card ch' }, h('div', { class: 'row sp' }, h('h3', {}, 'Where the edge comes from'), seg), h('div', { class: 'cwrap' }, tcC), tcNote));
-
-  // ---------- sub-tables (everything editable lives here)
-  const presetSel = h('select', {}, h('option', { value: '' }, 'Custom game'), PRESETS.map((p) => h('option', { value: p.id }, `${p.name} — ${p.tag}`)));
+  const presetSel = h('select', {}, h('option', { value: '' }, 'Custom game'), PRESETS.map((p) => h('option', { value: p.id }, p.name)));
   presetSel.addEventListener('change', () => {
     if (!presetSel.value) return;
     const c = configFromPreset(presetSel.value);
@@ -74,26 +36,50 @@ export function mount(root, app) {
   });
   const unitIn = h('input', { type: 'number', min: 1, step: 1 });
   unitIn.addEventListener('change', () => { app.cfg.spread.unit = Math.max(1, +unitIn.value || 25); app.change('spread.unit'); });
+  const chipBtn = (k) => h('button', { class: 'chip', 'data-k': k, onclick: () => { app.cfg.spread.bets = [...SPREAD_PRESETS[k]]; app.change('spread.bets'); } }, k);
+  const spreadSummary = h('div', { class: 'evf-note' });
+  const setup = h('div', { class: 'evf-setup' },
+    h('div', { class: 'evf-row' }, h('label', {}, 'Ruleset'), presetSel),
+    F({ path: 'player.bankroll', label: 'Bankroll ($)', min: 100, step: 500 }),
+    h('div', { class: 'evf-row' }, h('label', {}, 'Bet spread'), h('div', { class: 'chips' }, ['1-4', '1-8', '1-12', '1-16'].map(chipBtn))),
+    h('div', { class: 'evf-row' }, h('label', {}, '1 unit ($)'), unitIn), spreadSummary,
+    h('p', { class: 'evf-note' }, 'Open the menu below for every rule, spread box, skill setting and tool.'));
+  const left = h('div', { class: 'evf-left' }, hero, sec, setup);
+
+  // ---------- right: bankroll over time with real simulated runs
+  const fanC = h('canvas');
+  const hoursOut = h('b', {}, st.hours + ' h');
+  const hoursIn = h('input', { type: 'range', min: 25, max: 1000, step: 25, value: st.hours, class: 'range' });
+  hoursIn.addEventListener('input', () => { st.hours = +hoursIn.value; hoursOut.textContent = st.hours + ' h'; st.mc = null; draw(); scheduleMC(); });
+  const mcNote = h('span', { class: 'evf-note' });
+  const chartCard = h('div', { class: 'evf-card ch' },
+    h('div', { class: 'row sp' }, h('div', {}, h('h3', {}, 'Expected bankroll over time'), h('div', { class: 'evf-note' }, `${MC_RUNS} real dealt-card runs vs. the expected curve`)),
+      h('div', { class: 'row' }, h('span', { class: 'evf-note' }, 'Hours'), hoursIn, hoursOut)),
+    h('div', { class: 'cwrap' }, fanC),
+    h('div', { class: 'row sp' }, h('div', { class: 'legend' }, h('span', {}, h('i', { style: { background: '#f2f6f3' } }), 'Average of runs'), h('span', {}, h('i', { style: { background: '#7ad4b4' } }), 'Single runs'), h('span', {}, h('i', { style: { background: '#4cc9a055' } }), 'Typical range'), h('span', {}, h('i', { style: { background: '#f2f6f3', opacity: 0.5 } }), 'Theory')), mcNote));
+
+  // ---------- pop-up menu (bottom): editors + detailed tools, each with a title and Back button
+  const sessNote = h('div', { class: 'sessnote', hidden: true });
+  const unitIn2 = h('input', { type: 'number', min: 1, step: 1 });
+  unitIn2.addEventListener('change', () => { app.cfg.spread.unit = Math.max(1, +unitIn2.value || 25); app.change('spread.unit'); });
   const sp = h('div', { class: 'spread10' }), spIn = [], spUsd = [];
   for (let i = 0; i < 10; i++) {
     const inp = h('input', { type: 'number', min: 0, step: 0.5 });
     inp.addEventListener('change', () => { app.cfg.spread.bets[i] = Math.max(0, +inp.value || 0); app.change('spread.bets'); });
     const d = h('small'); spIn.push(inp); spUsd.push(d);
-    sp.append(h('div', {}, h('label', {}, i === 0 ? '≤0' : i === 9 ? '9+' : i), inp, d));
+    sp.append(h('div', {}, h('label', {}, i === 0 ? 'TC ≤0' : i === 9 ? 'TC 9+' : 'TC ' + i), inp, d));
   }
-  const spreadChips = h('div', { class: 'chips' }, ...['1-4', '1-8', '1-12', '1-16', '1-20', 'Flat'].map((k) =>
-    h('button', { class: 'chip', onclick: () => { app.cfg.spread.bets = [...SPREAD_PRESETS[k]]; app.change('spread.bets'); } }, k)));
   const slider = (path, label, max, hint) => {
     const out = h('b', { class: 'sv' }), inp = h('input', { type: 'range', min: 0, max, step: 0.5, class: 'range' });
     inp.addEventListener('input', () => { out.textContent = inp.value + '%'; });
     inp.addEventListener('change', () => { setPath(app.cfg, path, +inp.value / 100); app.change(path); });
     const reg = { path, set: () => { inp.value = +(getPath(app.cfg, path) * 100).toFixed(2); out.textContent = inp.value + '%'; } }; app.fields.push(reg); reg.set();
-    return h('div', { class: 'sl' }, h('div', { class: 'row sp' }, h('label', { title: hint }, label), out), inp);
+    return h('div', { class: 'sl' }, h('div', { class: 'row sp' }, h('label', { title: hint }, label), out), h('div', { class: 'evf-note' }, hint), inp);
   };
-  const sessNote = h('div', { class: 'sessnote', hidden: true });
-  const link = (txt, id) => h('button', { class: 'link', onclick: () => app.show(id) }, txt);
-  const panels = {
-    game: ['Game', h('div', {}, h('div', { class: 'mini3' }, h('div', { class: 'field' }, h('label', {}, 'Preset'), presetSel),
+  const go = (txt, id) => h('button', { class: 'link', onclick: () => openPanel(id) }, txt);
+  const PANELS = {
+    game: ['Game rules', 'The table you are playing: decks, dealer rules, payout, penetration and limits', () => h('div', {}, h('div', { class: 'mini3' },
+      h('div', { class: 'field' }, h('label', {}, 'Ruleset'), (() => { const s = presetSel.cloneNode(true); s.value = app.cfg.preset || ''; s.addEventListener('change', () => { presetSel.value = s.value; presetSel.dispatchEvent(new Event('change')); }); return s; })()),
       F({ path: 'rules.decks', label: 'Decks', type: 'select', options: [[1, '1'], [2, '2'], [4, '4'], [6, '6'], [8, '8']] }),
       F({ path: 'rules.h17', label: 'Dealer hits soft 17', type: 'bool' }),
       F({ path: 'rules.bjPay', label: 'Blackjack pays', type: 'select', options: [[1.5, '3:2'], [1.2, '6:5'], [1.4, '7:5'], [1, '1:1'], [2, '2:1']] }),
@@ -101,89 +87,125 @@ export function mount(root, app) {
       F({ path: 'rules.penetration', label: 'Penetration %', scale: 100, min: 30, max: 95, disabledIf: (c) => c.rules.csm }),
       F({ path: 'table.roundsPerHour', label: 'Hands per hour', min: 20, max: 300 }),
       F({ path: 'table.minBet', label: 'Table minimum ($)', min: 1 }), F({ path: 'table.maxBet', label: 'Table maximum ($)', min: 1 })),
-    link('All rules, other players, paste/copy table rules →', 'game'))],
-    spread: ['Bet spread', h('div', {}, h('div', { class: 'row', style: { marginBottom: '8px' } }, h('label', { class: 'u' }, '1 unit = $'), unitIn, spreadChips), sp, h('p', { class: 'evf-note' }, 'Units bet at each true count (≤0 up to 9+). Dollars shown under each box after table limits.'), link('What spread is ideal for my bankroll? →', 'ideal'))],
-    skill: ['Skill', h('div', {}, sessNote, h('div', { class: 'mini3' },
+    go('Every rule, other players, copy/paste table rules →', 'fullrules'))],
+    spread: ['Bet spread', 'How many units you bet at each true count (TC); dollars shown under each box after table limits', () => h('div', {},
+      h('div', { class: 'row', style: { marginBottom: '10px' } }, h('label', { class: 'u' }, '1 unit = $'), unitIn2, h('div', { class: 'chips' }, ['1-4', '1-8', '1-12', '1-16', '1-20', 'Flat'].map(chipBtn))), sp,
+      go('What spread is ideal for my bankroll? →', 'ideal'))],
+    skill: ['Player skill', 'Which index plays you use, and how often you slip on the count or play the wrong move', () => h('div', {}, sessNote, h('div', { class: 'mini3' },
       F({ path: 'player.deviations', label: 'Plays', type: 'select', options: [['none', 'Basic strategy only'], ['insurance', '+ insurance'], ['i18', '+ Illustrious 18'], ['i18fab4', '+ I18 & Fab 4'], ['full', '+ extended chart set'], ['engine', 'Everything (engine set)']] }),
-      slider('player.countErrorRate', 'Count slips / round', 20, 'Chance each round your running count slips by ±1'),
-      slider('player.mistakeRate', 'Wrong plays / decision', 20, 'Chance you play the wrong move')), link('Rounding, deck estimation, back-counting, per-play toggles →', 'player'))],
-    bank: ['Bankroll & costs', h('div', {}, h('div', { class: 'mini3' },
+      slider('player.countErrorRate', 'Count slips per round', 20, 'Chance each round your running count is off by one'),
+      slider('player.mistakeRate', 'Wrong plays per decision', 20, 'Chance you play the wrong move')), go('Rounding, deck estimation, back-counting, per-play switches →', 'skilldetails'))],
+    bank: ['Bankroll & costs', 'Your stake, plus anything that eats into (or adds to) your hourly', () => h('div', {}, h('div', { class: 'mini3' },
       F({ path: 'player.bankroll', label: 'Bankroll ($)', min: 100, step: 500 }),
-      F({ path: 'costs.hourlyCost', label: 'Fixed cost / hour ($)', min: 0 }), F({ path: 'costs.rakePerHand', label: 'Rake per hand ($)', min: 0, step: 0.05 }),
+      F({ path: 'costs.hourlyCost', label: 'Fixed cost per hour ($)', min: 0 }), F({ path: 'costs.rakePerHand', label: 'Rake per hand ($)', min: 0, step: 0.05 }),
       F({ path: 'costs.winCommission', label: 'Commission on wins (%)', min: 0, max: 20, step: 0.5 }), F({ path: 'costs.compPct', label: 'Comps (% of wagers)', min: 0, max: 5, step: 0.05 })),
-    link('Ideal bets for this bankroll →', 'ideal'))],
+    go('Ideal bets for this bankroll →', 'ideal'))],
   };
-  const drawer = h('div', { class: 'evf-drawer' });
-  const tabBtns = {};
-  const openPanel = (k) => {
-    st.open = st.open === k ? null : k;
-    drawer.innerHTML = '';
-    if (st.open) drawer.append(h('div', { class: 'evf-drawerhead' }, h('b', {}, panels[st.open][0]), h('button', { class: 'glass', onclick: () => openPanel(st.open) }, 'Done')), panels[st.open][1]);
-    drawer.classList.toggle('open', !!st.open);
+  const TOOL = { fullrules: 'game', skilldetails: 'player' };
+  const TOOL_META = {
+    fullrules: ['Full rules, table & costs', 'Every rule, other players, rake/comps, and copy/paste table-rules text'],
+    skilldetails: ['Skill details', 'True-count rounding, deck estimation, back-counting and per-play switches'],
+    ideal: ['Ideal bets', 'The best bet spread for your bankroll at a target risk of ruin'],
+    sim: ['Simulation', 'Thousands of bankroll runs with confidence bands and ruin curves'],
+    whatif: ['What-if', 'Compare count errors, mistakes, penetration, decks and more side by side'],
+    results: ['Spread details', 'Every metric, spread comparison and sanity check'],
+    strategy: ['Strategy charts', 'Basic strategy generated for your rules, with index plays marked'],
+    help: ['Help', 'Glossary, table-rules syntax and how the numbers are produced'],
+  };
+  const toolMod = Object.fromEntries(app.tools.map(([id, , mod]) => [id, mod]));
+  const drawer = h('div', { class: 'evf-drawer' }), tabBtns = {}, built = {};
+  const drawerTitle = h('b'), drawerSub = h('span'), drawerBody = h('div', { class: 'evf-drawerbody' });
+  drawer.append(h('div', { class: 'evf-drawerhead' }, h('button', { class: 'glass', onclick: () => openPanel(null) }, '‹ Back'), h('div', {}, drawerTitle, drawerSub)), drawerBody);
+  function openPanel(k) {
+    st.open = k && st.open !== k ? k : null;
+    if (!st.open) { drawer.classList.remove('open'); Object.values(tabBtns).forEach((b) => b.classList.remove('on')); return; }
+    if (!built[st.open]) {
+      const el = h('div');
+      if (PANELS[st.open]) el.append(PANELS[st.open][2]());
+      else { const mod = toolMod[TOOL[st.open] || st.open]; built[st.open] = { el, api: mod.mount(el, app) }; }
+      built[st.open] = built[st.open] || { el };
+      built[st.open].el = el; drawerBody.append(el);
+    }
+    const [title, sub] = PANELS[st.open] ? [PANELS[st.open][0], PANELS[st.open][1]] : TOOL_META[st.open];
+    drawerTitle.textContent = title; drawerSub.textContent = sub;
+    for (const [id, b] of Object.entries(built)) b.el.style.display = id === st.open ? '' : 'none';
+    built[st.open].api && built[st.open].api.update && built[st.open].api.update();
+    drawerBody.scrollTop = 0; drawer.classList.add('open');
     Object.entries(tabBtns).forEach(([kk, b]) => b.classList.toggle('on', kk === st.open));
-  };
-  const bankIn = F({ path: 'player.bankroll', label: 'Bankroll', min: 100, step: 500 });
-  const dock = h('div', { class: 'evf-dock' },
-    h('div', { class: 'evf-quick' }, bankIn, h('div', { class: 'evf-spreadq' }, h('label', {}, 'Spread'), h('div', { class: 'chips' }, ...['1-4', '1-8', '1-12', '1-16'].map((k) => h('button', { class: 'chip', 'data-k': k, onclick: () => { app.cfg.spread.bets = [...SPREAD_PRESETS[k]]; app.change('spread.bets'); } }, k))))),
-    h('div', { class: 'evf-tabs' }, ...Object.entries(panels).map(([k, [t]]) => { const b = h('button', { class: 'evf-tab', onclick: () => openPanel(k) }, t); tabBtns[k] = b; return b; })));
+    draw();
+  }
+  app.evOpenPanel = (id) => { if (id === 'home') openPanel(null); else if (id !== st.open) openPanel(id); };
+  app.evClosePanel = () => { if (st.open) { openPanel(null); return true; } return false; };
+  const TABS = [['game', 'Game'], ['spread', 'Bet spread'], ['skill', 'Skill'], ['bank', 'Bankroll & costs'], null, ['ideal', 'Ideal bets'], ['sim', 'Simulation'], ['whatif', 'What-if'], ['strategy', 'Strategy charts'], ['results', 'Details'], ['help', 'Help']];
+  const tabs = h('div', { class: 'evf-tabs' }, TABS.map((t) => { if (!t) return h('i', { class: 'evf-sep' }); const b = h('button', { class: 'evf-tab', onclick: () => openPanel(t[0]) }, t[1]); tabBtns[t[0]] = b; return b; }));
 
-  root.append(h('div', { class: 'evf' }, head, verdict, hero, sec, charts, h('div', { class: 'evf-bottom' }, drawer, dock)));
+  root.append(h('div', { class: 'evf' }, head, h('div', { class: 'evf-main' }, left, chartCard), h('div', { class: 'evf-bottom' }, drawer, h('div', { class: 'evf-dock' }, h('span', { class: 'evf-docklabel' }, 'Edit & explore'), tabs))));
 
-  const heroCard = (label, value, sub, cls) => h('div', { class: 'evf-h ' + (cls || '') }, h('label', {}, label), h('b', {}, value), h('small', {}, sub));
-  const secItem = (l, v) => h('div', {}, h('label', {}, l), h('b', {}, v));
-
+  // ---------- drawing
+  const heroCard = (label, value, sub, cls, big) => h('div', { class: 'evf-h ' + (cls || '') + (big ? ' big' : '') }, h('label', {}, label), h('b', {}, value), h('small', {}, sub));
   function draw() {
     const c = app.cfg;
     presetSel.value = c.preset || '';
     const p = PRESETS.find((x) => x.id === c.preset);
     document.getElementById('evGame').textContent = p ? p.name : 'Custom game';
-    unitIn.value = c.spread.unit;
+    unitIn.value = unitIn2.value = c.spread.unit;
     sessNote.hidden = !app.sessionNote; sessNote.textContent = app.sessionNote || '';
     const cur = app.evalCurrent();
     spIn.forEach((i, k) => { if (document.activeElement !== i) i.value = c.spread.bets[k]; });
-    if (cur) spUsd.forEach((d, k) => { d.textContent = '$' + Math.round(cur.bets[Math.max(0, Math.min(NBINS - 1, k - TC_MIN))]); });
-    dock.querySelectorAll('.chip').forEach((b) => b.classList.toggle('on', SPREAD_PRESETS[b.dataset.k]?.join(',') === c.spread.bets.join(',')));
-    if (!cur) { verdict.textContent = 'Crunching millions of simulated hands…'; verdict.className = 'evf-verdict'; return; }
+    if (cur) {
+      spUsd.forEach((d, k) => { d.textContent = '$' + Math.round(cur.bets[Math.max(0, Math.min(NBINS - 1, k - TC_MIN))]); });
+      const played = [...cur.bets].filter((b) => b > 0);
+      spreadSummary.textContent = played.length ? `Bets from ${fmt.money(Math.min(...played))} to ${fmt.money(Math.max(...played))} · average ${fmt.money(cur.ev.avgBet)}` : '';
+    }
+    root.querySelectorAll('.chip').forEach((b) => b.classList.toggle('on', SPREAD_PRESETS[b.dataset.k]?.join(',') === c.spread.bets.join(',')));
+    if (!cur) { hero.innerHTML = ''; hero.append(h('div', { class: 'evf-note' }, 'Crunching millions of simulated hands…')); return; }
     const e = cur.ev, B = c.player.bankroll, H = st.hours;
-    const good = e.evHr > 0 && e.ror < 0.05, ok = e.evHr > 0;
-    verdict.className = 'evf-verdict ' + (good ? 'good' : ok ? 'warn' : 'bad');
-    verdict.textContent = e.evHr <= 0 ? `Not beatable with this setup: expect to lose about ${fmt.money(-e.evHr)} per hour even while counting.`
-      : `Expect to win about ${fmt.money(e.evHr)} per hour — with ${fmt.money(B)} there is a ${fmt.pct(e.ror, 1)} chance of going broke${good ? ' (acceptable).' : e.ror > 0.2 ? ' (too risky — raise the bankroll or shrink the spread).' : '.'}`;
     hero.innerHTML = '';
     hero.append(
-      heroCard('EV per hour', fmt.money(e.evHr, 2), `${fmt.money(e.evHr / Math.max(1, e.handsPlayedHr) * 100, 2)} per 100 hands · ${fmt.num(e.handsPlayedHr, 0)} hands/hr`, e.evHr > 0 ? 'pos' : 'neg'),
-      heroCard('Risk of ruin', e.evRound > 0 ? fmt.pct(e.ror, 1) : '100%', `bankroll ${fmt.money(B)}`, e.ror > 0.05 ? 'neg' : 'pos'),
-      heroCard('Your edge vs. house', fmt.pct(e.edgePct / 100, 2), `house edge ${fmt.pct(-app.baseEdge, 2)} at a neutral count`, e.edgePct > 0 ? 'pos' : 'neg'));
+      heroCard('EV per hour', fmt.money(e.evHr, 2), `${fmt.money(e.evHr / Math.max(1, e.handsPlayedHr) * 100, 2)} per 100 hands`, e.evHr > 0 ? 'pos' : 'neg', true),
+      heroCard('Risk of ruin', e.evRound > 0 ? fmt.pct(e.ror, 1) : '100%', `with ${fmt.money(B)}`, e.ror > 0.05 ? 'neg' : 'pos'),
+      heroCard('Edge vs. house', fmt.pct(e.edgePct / 100, 2), `house ${fmt.pct(-app.baseEdge, 2)} at neutral`, e.edgePct > 0 ? 'pos' : 'neg'));
     sec.innerHTML = '';
-    sec.append(secItem('Swing (1σ / hr)', fmt.money(e.sdHr)), secItem('Average bet', fmt.money(e.avgBet)), secItem('Hours to 95% sure profit', fmt.hours(e.n95Hours)),
-      secItem('Bankroll for 5% risk', fmt.money(e.evRound > 0 ? (-Math.log(0.05) * e.variance) / (2 * e.evRound) : Infinity)),
-      secItem('Bankroll for 1% risk', fmt.money(e.evRound > 0 ? (-Math.log(0.01) * e.variance) / (2 * e.evRound) : Infinity)), secItem('N0 (hands)', fmt.big(e.n0)));
-    // fan
+    sec.append(h('div', {}, h('label', {}, 'Swing per hour (1σ)'), h('b', {}, fmt.money(e.sdHr))), h('div', {}, h('label', {}, 'Hours to 95% sure profit'), h('b', {}, fmt.hours(e.n95Hours))),
+      h('div', {}, h('label', {}, 'Bankroll for 1% risk'), h('b', {}, fmt.money(e.evRound > 0 ? (-Math.log(0.01) * e.variance) / (2 * e.evRound) : Infinity))));
+    // chart: simulated runs + average + range, theory dashed
     const xs = Array.from({ length: 61 }, (_, i) => (i / 60) * H);
     const mean = xs.map((x) => B + e.evHr * x), sd = xs.map((x) => e.sdHr * Math.sqrt(x));
-    const lo = (k) => xs.map((_, i) => Math.max(0, mean[i] - k * sd[i])), hi = (k) => xs.map((_, i) => mean[i] + k * sd[i]);
-    const series = [{ name: 'Expected', x: xs, y: mean, color: '#f4efe0', width: 2.4 }];
+    const theory = { name: 'Theory', x: xs, y: mean, color: '#f2f6f3', width: 1.4, dash: [5, 4], alpha: 0.55 };
+    const series = [], bands = [];
     if (st.mc && st.mcHours === H) {
       const m = st.mc, mx = Array.from({ length: m.W }, (_, i) => (i / m.cp) * H);
-      for (let r = 0; r < Math.min(8, m.runs); r++) series.push({ name: 'Run ' + (r + 1), x: mx, y: Array.from({ length: m.W }, (_, k) => m.traj[r * m.W + k]), color: ['#6ea8e0', '#a592da', '#d6a85a', '#e0955f', '#7fcfb4', '#e5707a', '#9cc3e8', '#bfaee6'][r], width: 1, alpha: 0.7, tip: false });
-      series.push({ name: 'Simulated average', x: mx, y: m.mean, color: '#d6a85a', width: 2 });
-      mcNote.textContent = `300 real runs: ${fmt.pct(m.profit, 0)} ended in profit, ${fmt.pct(m.ruinProb, 1)} went broke.`;
-    } else mcNote.textContent = st.mc ? '' : 'Analytic projection';
-    lineChart(fanC, { bands: [{ x: xs, lo: lo(2), hi: hi(2), color: '#4cc9a0', alpha: 0.12 }, { x: xs, lo: lo(1), hi: hi(1), color: '#4cc9a0', alpha: 0.24 }], series, refLines: [{ y: B, color: '#d6a85a' }], yMin: 0, yFmt: (v) => fmt.money(v), xFmt: (v) => v.toFixed(0) + 'h' });
-    // by count
-    const s = app.stats, labels = [], vals = [], errs = [], line = [], cols = [], rph = c.table.roundsPerHour;
-    for (let i = 0; i < NBINS; i++) {
-      const tc = i + TC_MIN; if (tc < -4 || tc > 10) continue;
-      labels.push(String(tc));
-      if (st.view === 'edge') { vals.push(s.rawMu[i] * 100); errs.push(s.se[i] * 100); line.push(s.fit[i] * 100); cols.push(s.n[i] < 3000 ? '#5d6c7b' : s.rawMu[i] >= 0 ? '#4cc9a0' : '#e5707a'); }
-      else if (st.view === 'bet') { vals.push(cur.bets[i]); cols.push('#6ea8e0'); }
-      else { const v = cur.bets[i] * s.f[i] * s.mu[i] * rph; vals.push(v); cols.push(v >= 0 ? '#4cc9a0' : '#e5707a'); }
+      bands.push({ x: mx, lo: Array.from(m.mean, (v, i) => Math.max(0, v - m.sd[i])), hi: Array.from(m.mean, (v, i) => v + m.sd[i]), color: '#4cc9a0', alpha: 0.16 });
+      for (let r = 0; r < Math.min(MC_SHOW, m.runs); r++) series.push({ name: 'Run ' + (r + 1), x: mx, y: Array.from({ length: m.W }, (_, k) => m.traj[r * m.W + k]), color: '#7ad4b4', width: 1, alpha: 0.5, tip: false });
+      series.push({ name: 'Average of runs', x: mx, y: m.mean, color: '#f2f6f3', width: 2.6 });
+      mcNote.textContent = `${fmt.pct(m.profit, 0)} of runs finished ahead · ${fmt.pct(m.ruinProb, 1)} went broke`;
+    } else {
+      bands.push({ x: xs, lo: xs.map((_, i) => Math.max(0, mean[i] - sd[i])), hi: xs.map((_, i) => mean[i] + sd[i]), color: '#4cc9a0', alpha: 0.14 });
+      mcNote.textContent = st.mcBusy ? 'Dealing real hands…' : '';
     }
-    barChart(tcC, st.view === 'edge' ? { labels, values: vals, errs, colors: cols, line: { values: line, color: '#d6a85a' }, yFmt: (v) => v.toFixed(1) + '%', xLabel: 'True count' } : { labels, values: vals, colors: cols, yFmt: (v) => fmt.money(v), xLabel: 'True count' });
-    tcNote.textContent = { profit: 'Dollars per hour earned at each count under your spread — big bets at high counts pay the bills.', edge: 'Average edge per dollar bet at each count. Each +1 count is worth about +0.5%.', bet: 'The bet you place at each count, after table limits.' }[st.view];
+    series.push(theory);
+    lineChart(fanC, { bands, series, refLines: [{ y: B, color: '#8fb2a5' }], yMin: 0, yFmt: (v) => fmt.money(v), xFmt: (v) => v.toFixed(0) + 'h' });
   }
-  app.on('cfg', () => { st.mc = null; if (!root.closest('[hidden]')) draw(); });
-  app.on('stats', draw); app.on('analysis', draw);
+
+  // real simulated runs (own worker pool so the main statistics job is never interrupted)
+  async function runMC() {
+    if (!app.stats || !app.setup || root.closest('[hidden]')) return;
+    const my = ++st.mcSeq; mcPool.cancel(); st.mcBusy = true; draw();
+    const cfg = app.cfg, cur = app.evalCurrent(), H = st.hours, rounds = Math.round(H * cfg.table.roundsPerHour), cp = 60;
+    try {
+      const parts = await mcPool.runBankroll(app.setup, { runs: MC_RUNS, rounds, checkpoints: cp, bets: cur.bets, bankroll: cfg.player.bankroll, minBet: cfg.table.minBet,
+        perRoundCost: (cfg.costs.hourlyCost || 0) / cfg.table.roundsPerHour, rakePerHand: cfg.costs.rakePerHand || 0, compPct: (cfg.costs.compPct || 0) / 100 }, null, (Date.now() % 99991) + my);
+      if (my !== st.mcSeq) return;
+      st.mc = aggregateRuns(parts, MC_RUNS, cp, rounds, cfg.player.bankroll); st.mcHours = H;
+    } catch (e) { /* cancelled */ }
+    if (my === st.mcSeq) { st.mcBusy = false; draw(); }
+  }
+  const scheduleMC = debounce(runMC, 450);
+
+  const toolsRefresh = () => { const b = st.open && built[st.open]; if (b && b.api && b.api.update) b.api.update(); };
+  app.on('cfg', () => { if (!root.closest('[hidden]')) { st.mc = null; draw(); } });
+  app.on('stats', () => { draw(); toolsRefresh(); scheduleMC(); });
+  app.on('analysis', () => { st.mc = null; draw(); toolsRefresh(); scheduleMC(); });
   draw();
-  return { update: draw, redraw: draw };
+  return { update: draw };
 }

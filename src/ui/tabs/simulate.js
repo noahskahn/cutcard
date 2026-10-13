@@ -61,10 +61,10 @@ export function mount(root, app) {
     // chart 1: paths + sigma bands
     const c1 = h('canvas', { class: 'chart tall' });
     const nShow = Math.min(8, ag.runs), W = ag.W;
-    const pathColors = ['#6ea8e0', '#a592da', '#d6a85a', '#e0955f', '#7fcfb4', '#e5707a', '#9cc3e8', '#bfaee6'];
+    const pathColors = ['#6ea8e0', '#a592da', '#bcd9cc', '#e0955f', '#7fcfb4', '#e5707a', '#9cc3e8', '#bfaee6'];
     const band = (k, color, a) => ({ x: xs, lo: Array.from(ag.mean, (m, i) => m - k * ag.sd[i]), hi: Array.from(ag.mean, (m, i) => m + k * ag.sd[i]), color, alpha: a });
     out.append(card('Bankroll over time — sample runs with ±1σ / ±2σ bands', 'Thin lines: individual simulated runs. White line: average across all runs. Shaded: one and two standard deviations across runs.', c1,
-      h('div', { class: 'legend' }, h('span', {}, h('i', { style: { background: '#e6edf3' } }), 'Mean'), h('span', {}, h('i', { style: { background: '#4cc9a0' } }), '±1σ'), h('span', {}, h('i', { style: { background: '#4cc9a088' } }), '±2σ'), h('span', {}, h('i', { style: { background: '#d6a85a' } }), 'Starting bankroll'))));
+      h('div', { class: 'legend' }, h('span', {}, h('i', { style: { background: '#e6edf3' } }), 'Mean'), h('span', {}, h('i', { style: { background: '#4cc9a0' } }), '±1σ'), h('span', {}, h('i', { style: { background: '#4cc9a088' } }), '±2σ'), h('span', {}, h('i', { style: { background: '#bcd9cc' } }), 'Starting bankroll'))));
     lineChart(c1, {
       bands: [band(2, '#4cc9a0', 0.10), band(1, '#4cc9a0', 0.20)],
       series: [
@@ -73,7 +73,7 @@ export function mount(root, app) {
         { name: '+1σ', x: xs, y: Array.from(ag.mean, (m, i) => m + ag.sd[i]), color: '#4cc9a0', width: 1, dash: [4, 3] },
         { name: '−1σ', x: xs, y: Array.from(ag.mean, (m, i) => m - ag.sd[i]), color: '#4cc9a0', width: 1, dash: [4, 3] },
       ],
-      refLines: [{ y: B, color: '#d6a85a' }], yFmt: (v) => fmt.money(v), xFmt: (v) => v.toFixed(0) + 'h', xLabel: 'Hours played', yMin: Math.min(0, ...ag.pct[5]),
+      refLines: [{ y: B, color: '#bcd9cc' }], yFmt: (v) => fmt.money(v), xFmt: (v) => v.toFixed(0) + 'h', xLabel: 'Hours played', yMin: Math.min(0, ...ag.pct[5]),
     });
     // chart 2: percentile fan
     const c2 = h('canvas', { class: 'chart' });
@@ -81,7 +81,7 @@ export function mount(root, app) {
     lineChart(c2, {
       bands: [{ x: xs, lo: ag.pct[5], hi: ag.pct[95], color: '#6ea8e0', alpha: 0.14 }, { x: xs, lo: ag.pct[25], hi: ag.pct[75], color: '#6ea8e0', alpha: 0.28 }],
       series: [{ name: 'Median', x: xs, y: ag.pct[50], color: '#6ea8e0', width: 2.2 }, { name: '95th pct', x: xs, y: ag.pct[95], color: '#6ea8e0', width: 1, dash: [3, 3] }, { name: '5th pct', x: xs, y: ag.pct[5], color: '#6ea8e0', width: 1, dash: [3, 3] },
-        { name: 'Expected (theory)', x: xs, y: xs.map((x) => B + ev.evHr * x), color: '#d6a85a', width: 1.6, dash: [6, 4] }],
+        { name: 'Expected (theory)', x: xs, y: xs.map((x) => B + ev.evHr * x), color: '#bcd9cc', width: 1.6, dash: [6, 4] }],
       refLines: [{ y: B, color: '#5d6c7b' }], yFmt: (v) => fmt.money(v), xFmt: (v) => v.toFixed(0) + 'h', xLabel: 'Hours played',
     });
     // chart 3 histogram, chart 4 ruin
@@ -94,7 +94,7 @@ export function mount(root, app) {
       colors: hist.counts.map((_, i) => (hist.lo + (i + .5) * hist.w >= B ? '#4cc9a0' : '#e5707a')), yFmt: (v) => v.toFixed(0) + '%', xLabel: 'Final bankroll ($)' });
     lineChart(c4, {
       series: [{ name: 'Simulated', x: xs, y: Array.from(ag.ruinCum, (v) => v * 100), color: '#e5707a', width: 2.2 },
-        { name: 'Formula', x: xs, y: xs.map((x) => tripRuin(ev.mu, ev.variance, B, x * cfg.table.roundsPerHour) * 100), color: '#d6a85a', width: 1.6, dash: [6, 4] }],
+        { name: 'Formula', x: xs, y: xs.map((x) => tripRuin(ev.mu, ev.variance, B, x * cfg.table.roundsPerHour) * 100), color: '#bcd9cc', width: 1.6, dash: [6, 4] }],
       yFmt: (v) => v.toFixed(1) + '%', xFmt: (v) => v.toFixed(0) + 'h', xLabel: 'Hours played', yMin: 0,
     });
   }

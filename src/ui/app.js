@@ -113,27 +113,7 @@ const TOOLS = [
   ['strategy', 'Strategy charts', strategyTab, 'Generated basic strategy + deviation indices'],
   ['help', 'Help & method', helpTab, 'Glossary, rules syntax, how it works'],
 ];
-const mounted = {};
-let active = null;
-
-function closeTool() { active = null; document.getElementById('modal').hidden = true; }
-function show(id) {
-  if (id === 'home') { closeTool(); return; }
-  const tool = TOOLS.find(([t]) => t === id); if (!tool) return;
-  active = id;
-  const body = document.getElementById('mbody');
-  if (!mounted[id]) { const el = h('div'); body.append(el); mounted[id] = { el, api: tool[2].mount(el, app) }; }
-  for (const k of Object.keys(mounted)) mounted[k].el.style.display = k === id ? '' : 'none';
-  document.getElementById('mtitle').textContent = tool[1];
-  document.getElementById('modal').hidden = false;
-  body.scrollTop = 0;
-  mounted[id].api.update && mounted[id].api.update();
-}
-app.show = show;
-function updateActive() { if (active && mounted[active]?.api.update) mounted[active].api.update(); }
-app.on('stats', updateActive);
-app.on('analysis', updateActive);
-
+app.show = (id) => { app.evOpenPanel && app.evOpenPanel(id); };
 // ---- EV calculator: the camera dives into the felt and the controls appear "printed" on it ----
 const evEl = document.getElementById('ev');
 let evMounted = false, evTimer = null;
@@ -143,7 +123,7 @@ app.tools = TOOLS;
 /** Turn the user's training-session performance into skill settings for the EV model. */
 function applySession() {
   const p = app.getPerformance && app.getPerformance();
-  if (!p || (p.decisions < 8 && p.quizzes < 3)) { app.evMsg && app.evMsg('Play a session first'); return false; }
+  if (!p || (p.decisions < 8 && p.quizzes < 3)) return false;
   const pl = app.cfg.player, parts = [];
   if (p.decisions >= 8) { pl.mistakeRate = Math.round((p.mistakes / p.decisions) * 1000) / 1000; parts.push(`${(pl.mistakeRate * 100).toFixed(1)}% wrong plays`); }
   if (p.quizzes >= 3 && p.mode !== 'strategy') { pl.countErrorRate = Math.min(0.3, Math.round((p.quizWrong / Math.max(1, p.rounds)) * 1000) / 1000); parts.push(`${(pl.countErrorRate * 100).toFixed(1)}% count slips per round`); }
@@ -168,15 +148,13 @@ app.openEV = (opts = {}) => {
   }, 620);
 };
 app.closeEV = () => {
-  clearTimeout(evTimer); closeTool();
+  clearTimeout(evTimer); app.evClosePanel && app.evClosePanel();
   evEl.classList.remove('ready'); evTimer = setTimeout(() => { evEl.hidden = true; }, 350);
   app.trainerActive = true; document.body.classList.remove('ev-open');
   if (app.busy) { app.pool.cancel(); app.seq++; app.setBusy(false); app.dirty = true; }
   app.onEVClose && app.onEVClose();
 };
-document.getElementById('mclose').addEventListener('click', closeTool);
-document.getElementById('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeTool(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (active) closeTool(); else if (!evEl.hidden) app.closeEV(); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !evEl.hidden) { if (!(app.evClosePanel && app.evClosePanel())) app.closeEV(); } });
 try { const a = localStorage.getItem('cutcard.acc'); if (a && ACCURACY[a]) app.ui.accuracy = a; } catch (e) { /* ignore */ }
 
 import('../trainer/ui.js').then((m) => m.mountTrainer(document.getElementById('trainer'), app));

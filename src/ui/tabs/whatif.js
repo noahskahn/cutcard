@@ -69,7 +69,7 @@ export function mount(root, app) {
       yFmt: (v) => fmt.money(v), xFmt: (v) => v + 'h', xLabel: 'Hours played',
     });
   }
-  const COLORS = ['#4cc9a0', '#6ea8e0', '#d6a85a', '#a592da', '#e0955f', '#e5707a', '#9cc3e8'];
+  const COLORS = ['#4cc9a0', '#6ea8e0', '#bcd9cc', '#a592da', '#e0955f', '#e5707a', '#9cc3e8'];
   root.append(h('div', { class: 'stack' },
     card('What-if comparison', 'Pick a factor, list the values to test, and see how profit changes. Each value runs a full card-by-card simulation of your game using your current spread and bankroll. Great for "how much does miscounting cost me?"',
       h('div', { class: 'grid g2' },
