@@ -11,21 +11,21 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const CAMERAS = {
   wide:  { rx: 50, s: 0.9,  ty: -52 },
   mid:   { rx: 44, s: 1.05, ty: -30 },
-  close: { rx: 37, s: 1.1, ty: -78 },
+  close: { rx: 34, s: 1.85, ty: -40 },
 };
 
 export class Scene {
   constructor(stage) {
     this.stage = stage;
     this.speed = 1;                // animation duration divisor
-    this.seats = []; this.dealer = null; this.cam = 'wide';
+    this.seats = []; this.dealer = null; this.cam = 'wide'; this.compact = false; this.dealerY = 168;
     stage.innerHTML = '';
     this.room = el('div', 'tr-room');
     this.world = el('div', 'tr-world');
     this.plane = el('div', 'tr-plane');
     this.world.append(this.plane);
     this.vig = el('div', 'tr-vignette');
-    this.stage.append(this.room, this.world, this.vig);
+    this.stage.append(this.room, this.world, this.vig, el('div', 'tr-sblur l'), el('div', 'tr-sblur r'));
     this._buildTable();
     this.ro = new ResizeObserver(() => this.camera(this.cam, 0));
     this.ro.observe(stage);
@@ -53,7 +53,7 @@ export class Scene {
     p.append(this.shoeEl, this.trayEl);
     this.cardLayer = el('div', 'tr-cards'); this.fxLayer = el('div', 'tr-cards fx');
     p.append(this.cardLayer, this.fxLayer);
-    this.dealer = { cx: PW / 2, cy: 168, hands: [this._newHand(PW / 2, 168)] };
+    this.dealer = { cx: PW / 2, cy: 168, hands: [this._newHand(PW / 2, this.dealerY)] };
     this._banner = el('div', 'tr-banner'); this.stage.append(this._banner);
   }
 
@@ -65,6 +65,9 @@ export class Scene {
     this.shoeEl.querySelector('.cutcard').style.bottom = `${Math.round((1 - penetration) * 100)}%`;
   }
 
+  /** Compact layout (basic-strategy drill): only your seat, dealer pulled close so both hands fill the view. */
+  setCompact(on) { this.compact = on; this.dealerY = on ? 292 : 168; this.dealer.hands = [this._newHand(PW / 2, this.dealerY)]; }
+
   /** Create seats along the player arc. mySeat sits dead centre. */
   setSeats(n, mySeat) {
     this.cardLayer.innerHTML = ''; this.fxLayer.innerHTML = '';
@@ -74,7 +77,7 @@ export class Scene {
     const step = Math.min(24, 68 / worst);
     for (let k = 0; k < n; k++) {
       const th = ((k - mySeat) * step * Math.PI) / 180;
-      const x = PW / 2 + 660 * Math.sin(th), y = 118 + 596 * Math.cos(th);
+      const x = PW / 2 + 660 * Math.sin(th), y = this.compact ? 585 : 118 + 596 * Math.cos(th);
       const spot = el('div', 'tr-spot' + (k === mySeat ? ' me' : ''), `<i></i><span>${k === mySeat ? 'YOU' : ''}</span>`);
       spot.style.cssText = `left:${x - 36}px;top:${y + 8}px;transform:rotate(${th * 0.55}rad)`;
       this.plane.append(spot);
@@ -205,7 +208,7 @@ export class Scene {
       return Promise.all([this._move(c, TRAY.x - CW / 2 + (Math.random() - 0.5) * 10, TRAY.y - CH / 2 + (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 20, d + i * 18, 'cubic-bezier(.5,0,.3,1)'), an.finished.catch(() => {})]);
     }));
     this.cardLayer.innerHTML = ''; this.fxLayer.innerHTML = '';
-    this.dealer.hands = [this._newHand(PW / 2, 168)];
+    this.dealer.hands = [this._newHand(PW / 2, this.dealerY)];
     this.seats.forEach((s) => { s.hands = [this._newHand(s.x, s.y - 40)]; });
     this.clearBets();
   }
@@ -213,7 +216,7 @@ export class Scene {
   /** Instantly empty the table (used when a session is stopped or the mode changes). */
   clearInstant() {
     this.cardLayer.innerHTML = ''; this.fxLayer.innerHTML = '';
-    this.dealer.hands = [this._newHand(PW / 2, 168)];
+    this.dealer.hands = [this._newHand(PW / 2, this.dealerY)];
     this.seats.forEach((s) => { s.hands = [this._newHand(s.x, s.y - 40)]; });
     this.clearBets(); this._banner.classList.remove('on'); this.setStacks(1);
   }

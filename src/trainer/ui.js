@@ -31,6 +31,8 @@ export function mountTrainer(root, app) {
   const dock = h('div', { class: 'tr-dock' }, fb, panel);
   const drawer = h('div', { class: 'tr-drawer' });
   const review = h('div', { class: 'tr-review', hidden: true });
+  const logList = h('div', { class: 'tr-loglist' });
+  const log = h('div', { class: 'tr-log', hidden: true }, h('div', { class: 'tr-loghead' }, h('b', {}, 'Decisions'), h('span', {}, 'newest first')), logList);
 
   const brand = h('div', { class: 'tr-brand' }, h('img', { src: 'assets/logo.svg', width: 34, height: 34, alt: '' }), h('div', {}, h('b', {}, 'Cutcard'), h('span', {}, 'Advantage-play trainer')));
   const corner = h('div', { class: 'tr-corner' },
@@ -57,7 +59,7 @@ export function mountTrainer(root, app) {
   const launch = h('div', { class: 'tr-launch' }, hint, h('div', { class: 'tr-modes3' }, modeCards), desc, opts,
     h('button', { class: 'tr-go', onclick: () => begin() }, 'Start training'));
 
-  root.append(h('div', { class: 'tr-body' }, stageEl, hud, brand, corner, statbar, dock, launch, drawer, review));
+  root.append(h('div', { class: 'tr-body' }, stageEl, hud, log, brand, corner, statbar, dock, launch, drawer, review));
 
   const scene = new Scene(stageEl);
   const ui = {
@@ -79,6 +81,16 @@ export function mountTrainer(root, app) {
       if (!kind) { fb.classList.remove('on'); return; }
       fb.className = 'tr-fb on ' + kind; fb.innerHTML = '';
       fb.append(title); if (small) fb.append(h('small', {}, small));
+    },
+    logEntry(kind, ok, info) {
+      const costTxt = !ok && kind === 'strat' && info.cost > 0.004 ? `−${(info.cost * 100).toFixed(1)}%` : '';
+      const sub = kind === 'strat'
+        ? (ok ? `${info.correct}${info.dev ? ' · index play' : ''}` : `${info.chosen} → ${info.correct}`)
+        : (ok ? `${info.chosen}` : `${info.chosen} → ${info.correct}`);
+      const row = h('div', { class: 'tr-logrow ' + (ok ? 'ok' : 'bad') },
+        h('i', {}, ok ? '✓' : '✗'), h('div', {}, h('b', {}, info.desc || ''), h('span', {}, sub)), costTxt ? h('em', {}, costTxt) : null);
+      logList.prepend(row);
+      while (logList.children.length > 40) logList.lastChild.remove();
     },
     shake() { stageEl.classList.remove('tr-shake'); void stageEl.offsetWidth; stageEl.classList.add('tr-shake'); },
     ask(prompt, type, hintTxt) {
@@ -123,24 +135,24 @@ export function mountTrainer(root, app) {
 
   // ---------------- state transitions
   function showIdle() {
-    statbar.hidden = true; launch.hidden = false; hud.innerHTML = ''; ui.clearDock(); session.paused = false; pauseBtn.textContent = 'Pause';
+    statbar.hidden = true; launch.hidden = false; log.hidden = true; hud.innerHTML = ''; ui.clearDock(); session.paused = false; pauseBtn.textContent = 'Pause';
     scene._banner.classList.remove('on');
   }
   function setMode(m) {
     const changed = m !== set.mode, was = !!session.tk;
     if (was) { session.stop(); scene.clearInstant(); review.hidden = true; }
-    set.mode = m; save(); markModes(); renderOpts(); showIdle();
+    set.mode = m; save(); markModes(); renderOpts(); showIdle(); session.applySpeed(); session.layoutScene();
     if (changed || was) scene.camera(camFor(m), 2000);   // camera glides to the new mode's view
   }
   function markModes() { modeCards.forEach((b) => b.classList.toggle('on', b.dataset.m === set.mode)); desc.textContent = MODES[set.mode].desc; }
   function begin() {
-    review.hidden = true; launch.hidden = true; statbar.hidden = false;
+    review.hidden = true; launch.hidden = true; statbar.hidden = false; logList.innerHTML = ''; log.hidden = false;
     modeLbl.textContent = MODES[set.mode].title;
     session.stats = session.freshStats(); session.roundNo = 0; ui.updateStats(session.stats);
     try { localStorage.setItem('cutcard.tut', localStorage.getItem('cutcard.tut') || 'skipped'); } catch (e) { /* ignore */ }
     session.start();
   }
-  function endSession() { statbar.hidden = true; session.stop(); scene.banner('', 1); scene._banner.classList.remove('on'); showReview(); }
+  function endSession() { statbar.hidden = true; log.hidden = true; session.stop(); scene.banner('', 1); scene._banner.classList.remove('on'); showReview(); }
   function backToTable() { review.hidden = true; scene.clearInstant(); showIdle(); scene.camera(camFor(set.mode), 1600); }
 
   function renderOpts() {
@@ -183,7 +195,7 @@ export function mountTrainer(root, app) {
   const sel = (key, optsList, after) => { const s = h('select', {}, optsList.map(([v, l]) => h('option', { value: String(v) }, l))); s.value = String(set[key]); s.addEventListener('change', () => { const o = optsList.find(([v]) => String(v) === s.value); set[key] = o[0]; save(); after && after(); renderDrawer(); }); return s; };
   const tog = (key, after) => { const i = h('input', { type: 'checkbox' }); i.checked = !!set[key]; i.addEventListener('change', () => { set[key] = i.checked; save(); after && after(); }); return h('label', { class: 'switch' }, i, h('span')); };
   const frow = (label, ctl, hintTxt) => h('div', { class: 'field' }, h('label', {}, label), ctl, hintTxt ? h('div', { class: 'hint' }, hintTxt) : null);
-  const restart = () => { clearTimeout(restart.t); restart.t = setTimeout(() => { if (session.tk) { session.stop(); scene.clearInstant(); } scene.setSeats(set.others + 1, Math.floor((set.others + 1) / 2)); scene.setRules({ bjPay: app.cfg.rules.bjPay, h17: app.cfg.rules.h17, penetration: app.cfg.rules.penetration }); showIdle(); }, 400); };
+  const restart = () => { clearTimeout(restart.t); restart.t = setTimeout(() => { if (session.tk) { session.stop(); scene.clearInstant(); } scene.setRules({ bjPay: app.cfg.rules.bjPay, h17: app.cfg.rules.h17, penetration: app.cfg.rules.penetration }); session.layoutScene(); showIdle(); }, 400); };
   const cpsOut = h('b', {});
   function renderDrawer() {
     drawer.innerHTML = '';
@@ -242,6 +254,6 @@ export function mountTrainer(root, app) {
   let seen = null; try { seen = localStorage.getItem('cutcard.tut'); } catch (e) { /* ignore */ }
   hint.hidden = !!seen;
   scene.setRules({ bjPay: app.cfg.rules.bjPay, h17: app.cfg.rules.h17, penetration: app.cfg.rules.penetration });
-  scene.setSeats(set.others + 1, Math.floor((set.others + 1) / 2));
+  session.layoutScene(); session.applySpeed();
   scene.camera(camFor(set.mode), 0);
 }

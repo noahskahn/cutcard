@@ -30,14 +30,21 @@ export class Session {
     this.R = R;
     this.adv = new Advisor(R, this.set.devSet);
     this.shoe = new Shoe(R.decks, R.csm ? 0.3 : R.penetration);
-    this.nSeats = this.set.others + 1;
-    this.mySeat = Math.floor(this.nSeats / 2);
     this.scene.setRules({ bjPay: R.bjPay, h17: R.h17, penetration: R.penetration });
-    this.scene.setSeats(this.nSeats, this.mySeat);
+    this.layoutScene();
     this.scene.setStacks(1);
     this.applySpeed();
   }
-  applySpeed() { this.scene.speed = Math.max(0.5, Math.min(5, this.set.cps / 2)); }
+  /** Strategy drill: just you and the dealer, laid out compactly. Other modes: the full table. */
+  layoutScene() {
+    const strat = this.set.mode === 'strategy';
+    this.nSeats = strat ? 1 : this.set.others + 1;
+    this.mySeat = Math.floor(this.nSeats / 2);
+    this.scene.setCompact(strat);
+    this.scene.setSeats(this.nSeats, this.mySeat);
+    this.scene.stage.classList.toggle('focus', strat);
+  }
+  applySpeed() { this.scene.speed = this.set.mode === 'strategy' ? 2.6 : Math.max(0.5, Math.min(5, this.set.cps / 2)); }
   start() {
     this.stop(); this.configure();
     this.tk = {}; this.paused = false;
@@ -65,8 +72,8 @@ export class Session {
     this.g(tk);
   }
   g(tk = this.tk) { if (tk !== this.tk || !tk) throw new Abort(); }
-  get interval() { return 1000 / (this.set.mode === 'strategy' ? this.set.cps * 1.8 : this.set.cps); }
-  get flight() { return 380; }
+  get interval() { return this.set.mode === 'strategy' ? 170 : 1000 / this.set.cps; }
+  get flight() { return this.set.mode === 'strategy' ? 330 : 380; }
 
   // ----------------------------------------------------------------- main loop
   async run(tk) {
@@ -329,6 +336,7 @@ export class Session {
     s.n++; if (ok) { s.ok++; s.streak++; s.best = Math.max(s.best, s.streak); } else s.streak = 0;
     if (kind === 'strat' && !ok) s.mistakes.push(info);
     this.ui.updateStats(this.stats);
+    this.ui.logEntry(kind, ok, info);
   }
 
   async maybeQuizMid(tk) {
@@ -342,6 +350,7 @@ export class Session {
     const { shoe, set } = this;
     const type = set.quizType === 'mixed' ? (Math.random() < 0.5 ? 'running' : 'true') : set.quizType;
     const wasDeciding = this._deciding;
+    const sgn = (v) => (v >= 0 ? '+' : '') + v;
     const t0 = performance.now();
     const ans = await this.ui.ask(type === 'running' ? 'What is the running count?' : 'What is the true count?', 'number', type === 'true' ? 'Estimate decks remaining from the discard tray, then divide.' : 'Hi-Lo: 2–6 = +1 · 7–9 = 0 · 10–A = −1');
     this.g(tk);
@@ -350,8 +359,7 @@ export class Session {
     const err = Math.abs(ans - exact);
     const ok = type === 'running' ? ans === shoe.rc : err <= set.tol + 1e-9;
     this.stats.count.errs.push(err); this.stats.count.times.push(secs);
-    this.record('count', ok, {});
-    const sgn = (v) => (v >= 0 ? '+' : '') + v;
+    this.record('count', ok, { desc: type === 'running' ? 'Running count' : 'True count', chosen: sgn(ans), correct: type === 'running' ? sgn(shoe.rc) : sgn(+exact.toFixed(1)) });
     const detail = type === 'running' ? `Running count ${sgn(shoe.rc)}` : `RC ${sgn(shoe.rc)} ÷ ${shoe.decksLeft.toFixed(1)} decks = ${sgn(exact.toFixed(1))}`;
     this.ui.feedback(ok ? 'ok' : 'bad', ok ? `Correct — ${detail}` : `Not quite — ${detail}`, ok ? `${secs.toFixed(1)}s` : `You said ${sgn(ans)}`);
     this.ui.clearDock(true);

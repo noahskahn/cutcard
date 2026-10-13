@@ -87,7 +87,7 @@ Whole dark theme (CSS variables at top), cards, forms, tables, strategy chart co
 | `advisor.js` | Correct-play oracle built on `strategy/` (generated basic strategy for the user's rules + I18/Fab4/engine deviations), legality, hand descriptions, EV cost of mistakes. |
 | `scene.js` | Semi-3D table in pure CSS 3D (perspective plane, rim, felt, vignette); cards, chips, pills, count tags; camera presets (`wide`, `mid`, `close`); all motion via transform/opacity (Web Animations API) so it stays GPU-cheap. |
 | `session.js` | Game flow (deal order, peek, insurance, split/double/surrender, dealer play, settlement), three modes (count / strategy / both), count quizzes (running/true), scoring, mistake log. |
-| `ui.js` | Home UI floating over the table: brand, Tutorial/Settings/EV buttons, mode picker + Start, stats bar, dock (actions, quizzes, feedback), settings drawer, session review; exposes `app.getPerformance()` for the EV calculator. |
+| `ui.js` | Home UI floating over the table (incl. left-side running decision log): brand, Tutorial/Settings/EV buttons, mode picker + Start, stats bar, dock (actions, quizzes, feedback), settings drawer, session review; exposes `app.getPerformance()` for the EV calculator. |
 | `tutorial.js` | Interactive 7-step tutorial (Hi-Lo tags, running count, true count, basic strategy, index plays, EV calculator). |
 | `css/trainer.css` | Table, cards, HUD styling. |
 

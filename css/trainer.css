@@ -209,3 +209,26 @@ body{background:#030507;overflow:hidden}
 .tr-review{background:rgba(3,6,8,.94);backdrop-filter:blur(10px);z-index:11}
 .tr-reviewbox .grid{grid-template-columns:repeat(3,1fr)}
 .tr-reviewbox .kpi b{font-size:24px}
+
+/* focus view (basic strategy): blurred, darkened sides */
+.tr-sblur{position:absolute;top:0;bottom:0;width:24%;pointer-events:none;opacity:0;transition:opacity 1.2s;backdrop-filter:blur(10px);background:linear-gradient(90deg,rgba(0,0,0,.6),rgba(0,0,0,0))}
+.tr-sblur.l{left:0;-webkit-mask-image:linear-gradient(90deg,#000 25%,transparent);mask-image:linear-gradient(90deg,#000 25%,transparent)}
+.tr-sblur.r{right:0;transform:scaleX(-1);-webkit-mask-image:linear-gradient(90deg,#000 25%,transparent);mask-image:linear-gradient(90deg,#000 25%,transparent)}
+.tr-stage.focus .tr-sblur{opacity:1}
+
+/* decision history (left) */
+.tr-log{position:absolute;left:18px;top:84px;bottom:110px;width:238px;z-index:6;pointer-events:none;display:flex;flex-direction:column;
+  -webkit-mask-image:linear-gradient(180deg,#000 0,#000 72%,transparent 100%);mask-image:linear-gradient(180deg,#000 0,#000 72%,transparent 100%)}
+.tr-log[hidden]{display:none}
+.tr-loghead{display:flex;justify-content:space-between;align-items:baseline;padding:0 4px 8px;color:var(--muted)}
+.tr-loghead b{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase}.tr-loghead span{font-size:10px;color:var(--faint)}
+.tr-loglist{display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.tr-logrow{display:flex;gap:9px;align-items:center;padding:7px 10px;border-radius:10px;background:rgba(9,14,18,.74);border:1px solid #ffffff17;animation:logIn .35s cubic-bezier(.2,.8,.3,1)}
+.tr-logrow i{font-style:normal;font-weight:800;width:18px;text-align:center}
+.tr-logrow.ok i{color:#6be3b9}.tr-logrow.bad i{color:#ff8d96}
+.tr-logrow.ok{border-left:3px solid #4cc9a0aa}.tr-logrow.bad{border-left:3px solid #e5707aaa}
+.tr-logrow div{flex:1;min-width:0}.tr-logrow b{display:block;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr-logrow span{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr-logrow em{font-style:normal;font-size:11px;font-weight:700;color:#ff9aa3}
+@keyframes logIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+@media (max-width:900px){.tr-log{display:none}}
