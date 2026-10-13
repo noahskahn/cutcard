@@ -10,6 +10,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export const CAMERAS = {
   wide:  { rx: 50, s: 0.9,  ty: -52 },
+  both:  { rx: 41, s: 1.0,  ty: -74, rz: -4.5 },   // Count + play: lower, rotated angle
+  felt:  { rx: 5,  s: 2.35, ty: 14 },              // EV calculator: looking down into the felt
   mid:   { rx: 44, s: 1.05, ty: -30 },
   close: { rx: 34, s: 1.85, ty: -40 },
 };
@@ -41,6 +43,8 @@ export class Scene {
       <path d="M 150 470 A 600 560 0 0 0 1350 470" fill="none" stroke="#d8b868" stroke-opacity=".35" stroke-width="2"/>
       <text class="tp big"><textPath href="#arcA" startOffset="50%" text-anchor="middle" id="tp-bj">BLACKJACK PAYS 3 TO 2</textPath></text>
       <text class="tp"><textPath href="#arcB" startOffset="50%" text-anchor="middle">INSURANCE PAYS 2 TO 1</textPath></text>
+      <text class="tp wm" x="750" y="388" text-anchor="middle">CUTCARD</text>
+      <text class="tp wm2" x="750" y="420" text-anchor="middle">ADVANTAGE PLAY</text>
       <text class="tp dl" x="750" y="268" text-anchor="middle" id="tp-s17">DEALER MUST STAND ON 17</text></svg>`;
     const print = el('div', 'tr-printwrap', svg); p.append(print);
     this.bjText = print.querySelector('#tp-bj'); this.s17Text = print.querySelector('#tp-s17');
@@ -94,7 +98,7 @@ export class Scene {
     const c = CAMERAS[name], sw = this.stage.clientWidth || 1200, sh = this.stage.clientHeight || 700;
     const fit = Math.min(sw / (PW + 80), sh / (PH * 0.66));
     this.world.style.transition = ms ? `transform ${ms}ms cubic-bezier(.55,.05,.2,1)` : 'none';
-    this.world.style.transform = `translate3d(0,${c.ty * fit}px,0) rotateX(${c.rx}deg) scale(${fit * c.s})`;
+    this.world.style.transform = `translate3d(0,${c.ty * fit}px,0) rotateX(${c.rx}deg) rotateZ(${c.rz || 0}deg) scale(${fit * c.s})`;
   }
 
   // ---------------------------------------------------------------- cards

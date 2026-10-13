@@ -232,3 +232,17 @@ body{background:#030507;overflow:hidden}
 .tr-logrow em{font-style:normal;font-size:11px;font-weight:700;color:#ff9aa3}
 @keyframes logIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
 @media (max-width:900px){.tr-log{display:none}}
+
+/* seamless wordmark */
+.tr-brand{gap:10px;left:24px;top:20px}
+.tr-brand b{font:700 14px Georgia,"Times New Roman",serif;letter-spacing:.42em;color:#e9d79f;text-shadow:0 1px 8px #000}
+.tr-brand img{opacity:.92;filter:drop-shadow(0 2px 6px #000a)}
+.tp.wm{font-size:58px;letter-spacing:.5em;fill-opacity:.13;fill:#e3c776}
+.tp.wm2{font-size:15px;letter-spacing:.7em;fill-opacity:.2}
+.tr-optrow.dim{opacity:.55}
+/* EV mode: only the felt + wordmark remain */
+.ev-mode .tr-corner,.ev-mode .tr-launch,.ev-mode .tr-statbar,.ev-mode .tr-log,.ev-mode .tr-hud,.ev-mode .tr-dock,.ev-mode .tr-drawer{display:none!important}
+.ev-mode .tr-sblur{opacity:0!important}
+.ev-mode .tr-vignette{opacity:.5;transition:opacity 1.4s}
+.ev-mode .tp{fill-opacity:.2}
+.ev-mode .tr-printwrap,.ev-mode .tr-spot,.ev-mode .tr-chiptray,.ev-mode .tr-shoe,.ev-mode .tr-tray{opacity:0;transition:opacity .8s}

@@ -14,7 +14,7 @@ Advantage-play analytics for blackjack. Model any rule set, count with Hi-Lo and
 - **Ideal bets:** Kelly-proportional ramp scaled to a target risk of ruin for any bankroll.
 
 ## How it works
-The home screen is the table: pick *Keep the count*, *Basic strategy* or *Count + play* (with optional index plays), press Start, and train. Press **EV calculator** for the analytics overlay (rules, bet spread, skill, bankroll → EV, risk of ruin, Monte Carlo), or **Calculate EV from my play** after a session to price your real accuracy. A built-in **Tutorial** walks through the basics.
+The home screen is the table: pick *Keep the count*, *Basic strategy* or *Count + play* (with optional index plays), press Start, and train. Press **EV calculator** and the camera dives into the felt, where the analytics are printed on the table (rules, bet spread, skill, bankroll → EV, risk of ruin, Monte Carlo), or **Calculate EV from my play** after a session to price your real accuracy. Wrong basic-strategy plays are saved so you can **drill only your mistakes**. A built-in **Tutorial** walks through the basics.
 
 ## Trainer
 The table is a semi-3D scene: *Keep the count* (Hi-Lo quizzes at configurable moments, running or true count), *Basic strategy* (camera swoops in; every play is graded with its EV cost; drill hard/soft/pairs/doubles/surrender spots), and *Count + deviations* (play Illustrious 18 / Fab 4 / engine indices from your own count). Deal speed, quiz cadence, training wheels (show count, +1/0/−1 tags) and table size are adjustable. Rendering uses CSS 3D transforms only (no WebGL, no per-frame JavaScript).

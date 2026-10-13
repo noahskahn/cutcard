@@ -5,6 +5,7 @@
 import { ACT, ACT_NAMES } from '../core/constants.js';
 import { Shoe } from './shoe.js';
 import { Advisor, handInfo, upName } from './advisor.js';
+import { mistakeBank } from './mistakes.js';
 
 class Abort extends Error {}
 const TAG = [0, -1, 1, 1, 1, 1, 1, 0, 0, 0, -1];
@@ -61,7 +62,7 @@ export class Session {
 
   camera(phase, ms) {
     const m = this.set.mode;
-    const cam = m === 'count' ? 'wide' : m === 'strategy' ? 'close' : phase === 'decide' ? 'mid' : 'wide';
+    const cam = m === 'count' ? 'wide' : m === 'strategy' ? 'close' : phase === 'decide' ? 'mid' : 'both';
     this.scene.camera(cam, ms);
   }
 
@@ -101,6 +102,11 @@ export class Session {
 
   makeRig() {
     const f = this.set.focus, R = this.R;
+    if (f === 'mistakes') {
+      const m = mistakeBank.pick();
+      if (m) { const c = Math.random() < 0.5 ? m.cards : [m.cards[1], m.cards[0]]; return { c, up: m.up }; }
+      return null;
+    }
     for (let i = 0; i < 400; i++) {
       const a = pickVal(), b = pickVal(), up = pickVal();
       const t = a + b, soft = (a === 1 || b === 1) && !(a === 1 && b === 1);
@@ -130,6 +136,7 @@ export class Session {
     for (let k = 0; k < n; k++) scene.setBet(k, 1);
     this.quizRoundAt = set.quizFreq === 'random' ? 4 + Math.floor(Math.random() * (n * 4 + 6)) : -1;
     const rig = set.mode !== 'count' && set.focus !== 'all' ? this.makeRig() : null;
+    if (set.focus === 'mistakes' && !rig) set.focus = 'all';
     const ms = this.interval;
     const hole = {};
     // deal: first card each seat, dealer up, second card each seat, dealer hole
@@ -312,7 +319,7 @@ export class Session {
     if (!ok) {
       try { const v = adv.values(hand, up, nHands, tc, useDev); cost = Math.max(0, (v[correct.action] - v[chosen]) || 0); } catch (e) { cost = 0; }
     }
-    this.record('strat', ok, { desc, chosen: ACT_NAMES[chosen], correct: ACT_NAMES[correct.action], cost, dev: !!correct.dev && !correct.dev.held });
+    this.record('strat', ok, { desc, chosen: ACT_NAMES[chosen], correct: ACT_NAMES[correct.action], cost, dev: !!correct.dev && !correct.dev.held, cards: [...hand.cards], up, fromSplit: hand.fromSplit });
     const dv = correct.dev && !correct.dev.held ? correct.dev : null;
     const tcTxt = `RC ${shoe.rc >= 0 ? '+' : ''}${shoe.rc} · ${shoe.decksEst} decks → true count ${tc >= 0 ? '+' : ''}${tc}`;
     if (ok) {
@@ -336,6 +343,7 @@ export class Session {
     s.n++; if (ok) { s.ok++; s.streak++; s.best = Math.max(s.best, s.streak); } else s.streak = 0;
     if (kind === 'strat' && !ok) s.mistakes.push(info);
     this.ui.updateStats(this.stats);
+    if (kind === 'strat') { mistakeBank.record(info, ok); this.ui.updateMistakes && this.ui.updateMistakes(); }
     this.ui.logEntry(kind, ok, info);
   }
 

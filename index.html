@@ -8,25 +8,12 @@
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/trainer.css">
+<link rel="stylesheet" href="css/ev.css">
 </head>
 <body>
 <div id="trainer"></div>
 
-<div class="ev-overlay" id="ev" hidden>
-  <div class="ev-panel">
-    <div class="ev-bar">
-      <div class="ev-title"><img src="assets/logo.svg" alt="" width="26" height="26"><div><b>EV calculator</b><span>expected value · risk of ruin · bankroll</span></div></div>
-      <div class="grow"></div>
-      <button class="btn small" id="useSession" title="Fill in your count slips and wrong-play rates from your last training session">Use my training performance</button>
-      <label class="acc" title="Rounds simulated per game setup. Higher = smoother statistics, slower.">Accuracy <select id="accuracy"><option value="quick">Quick (1M)</option><option value="standard">Standard (4M)</option><option value="high">High (20M)</option></select></label>
-      <div class="status" id="status"><span class="dot"></span><span id="statusText">Ready</span></div>
-      <button class="btn small" id="shareBtn" title="Copy a link to this exact setup">Share</button>
-      <div class="menuwrap"><button class="btn small" id="toolsBtn">More tools &#9662;</button><div class="menu" id="toolsMenu"></div></div>
-      <button class="btn small primary" id="evClose">Back to table</button>
-    </div>
-    <main id="main"></main>
-  </div>
-</div>
+<div class="evf-root" id="ev" hidden></div>
 
 <div class="modal" id="modal" hidden><div class="mpanel"><div class="mhead"><b id="mtitle"></b><button class="btn small" id="mclose">Close ✕</button></div><div class="mbody" id="mbody"></div></div></div>
 <div class="tut" id="tutorial" hidden></div>

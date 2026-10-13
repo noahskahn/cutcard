@@ -8,7 +8,7 @@ import { betsFromSpread, evaluateBets } from '../analysis/spread.js';
 import { strategyEV } from '../strategy/houseEdge.js';
 import { deriveIndices } from '../strategy/deviations.js';
 import { h, fmt, debounce } from './dom.js';
-import * as dashTab from './tabs/dashboard.js';
+import * as evPanel from './evpanel.js';
 import * as gameTab from './tabs/game.js';
 import * as playerTab from './tabs/player.js';
 import * as resultsTab from './tabs/results.js';
@@ -97,9 +97,9 @@ export const app = {
   },
   setBusy(b, p = 0, msg) {
     this.busy = b; this.progress = p;
-    const el = document.getElementById('status');
+    const el = this.statusEl; if (!el) return;
     el.classList.toggle('busy', b);
-    document.getElementById('statusText').textContent = msg || (b ? `Simulating… ${Math.round(p * 100)}%` : `Up to date · ${fmt.big(this.stats?.overall.rounds || 0)} rounds`);
+    this.statusTextEl.textContent = msg || (b ? `Simulating… ${Math.round(p * 100)}%` : `Up to date · ${fmt.big(this.stats?.overall.rounds || 0)} rounds`);
   },
 };
 
@@ -134,16 +134,16 @@ function updateActive() { if (active && mounted[active]?.api.update) mounted[act
 app.on('stats', updateActive);
 app.on('analysis', updateActive);
 
-// ---- EV calculator overlay (blurred background); the table (trainer) is the home screen ----
+// ---- EV calculator: the camera dives into the felt and the controls appear "printed" on it ----
 const evEl = document.getElementById('ev');
-let dashMounted = false;
+let evMounted = false, evTimer = null;
 app.trainerActive = true;
+app.tools = TOOLS;
 
 /** Turn the user's training-session performance into skill settings for the EV model. */
 function applySession() {
   const p = app.getPerformance && app.getPerformance();
-  const note = document.getElementById('useSession');
-  if (!p || (p.decisions < 8 && p.quizzes < 3)) { note.textContent = 'Play a session first'; setTimeout(() => (note.textContent = 'Use my training performance'), 2200); return false; }
+  if (!p || (p.decisions < 8 && p.quizzes < 3)) { app.evMsg && app.evMsg('Play a session first'); return false; }
   const pl = app.cfg.player, parts = [];
   if (p.decisions >= 8) { pl.mistakeRate = Math.round((p.mistakes / p.decisions) * 1000) / 1000; parts.push(`${(pl.mistakeRate * 100).toFixed(1)}% wrong plays`); }
   if (p.quizzes >= 3 && p.mode !== 'strategy') { pl.countErrorRate = Math.min(0.3, Math.round((p.quizWrong / Math.max(1, p.rounds)) * 1000) / 1000); parts.push(`${(pl.countErrorRate * 100).toFixed(1)}% count slips per round`); }
@@ -153,38 +153,32 @@ function applySession() {
   app.emit('cfg');
   return true;
 }
+app.applySession = applySession;
 app.openEV = (opts = {}) => {
-  evEl.hidden = false; app.trainerActive = false; document.body.classList.add('ev-open');
-  if (!dashMounted) { dashTab.mount(document.getElementById('main'), app); dashMounted = true; }
+  clearTimeout(evTimer);
+  app.trainerActive = false; document.body.classList.add('ev-open');
+  if (!evMounted) { evPanel.mount(evEl, app); evMounted = true; }
+  evEl.hidden = false; evEl.classList.remove('ready');
+  try { const a = localStorage.getItem('cutcard.acc'); if (a && ACCURACY[a]) app.ui.accuracy = a; } catch (e) { /* ignore */ }
   if (opts.fromSession) applySession();
-  if (app.dirty || !app.stats) { app.dirty = false; app.recompute(); } else { app.emit('analysis'); app.setBusy(false); }
   app.onEVOpen && app.onEVOpen();
+  evTimer = setTimeout(() => {
+    evEl.classList.add('ready');
+    if (app.dirty || !app.stats) { app.dirty = false; app.recompute(); } else { app.emit('analysis'); app.setBusy(false); }
+  }, 1500);
 };
 app.closeEV = () => {
-  closeTool(); evEl.hidden = true; app.trainerActive = true; document.body.classList.remove('ev-open');
+  clearTimeout(evTimer); closeTool();
+  evEl.classList.remove('ready'); evTimer = setTimeout(() => { evEl.hidden = true; }, 350);
+  app.trainerActive = true; document.body.classList.remove('ev-open');
   if (app.busy) { app.pool.cancel(); app.seq++; app.setBusy(false); app.dirty = true; }
   app.onEVClose && app.onEVClose();
 };
-document.getElementById('evClose').addEventListener('click', () => app.closeEV());
-document.getElementById('useSession').addEventListener('click', applySession);
-
-const menu = document.getElementById('toolsMenu');
-for (const [id, title, , sub] of TOOLS) menu.append(h('button', { onclick: () => { menu.classList.remove('open'); show(id); } }, h('b', {}, title), h('small', {}, sub)));
-document.getElementById('toolsBtn').addEventListener('click', (e) => { e.stopPropagation(); menu.classList.toggle('open'); });
-document.addEventListener('click', () => menu.classList.remove('open'));
 document.getElementById('mclose').addEventListener('click', closeTool);
 document.getElementById('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeTool(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (active) closeTool(); else if (!evEl.hidden) app.closeEV(); } });
-document.getElementById('shareBtn').addEventListener('click', async (e) => {
-  const b = e.currentTarget;
-  try { await navigator.clipboard.writeText(app.shareLink()); b.textContent = 'Link copied ✓'; } catch (err) { b.textContent = 'Copy failed'; }
-  setTimeout(() => (b.textContent = 'Share'), 2000);
-});
-const accSel = document.getElementById('accuracy');
 try { const a = localStorage.getItem('cutcard.acc'); if (a && ACCURACY[a]) app.ui.accuracy = a; } catch (e) { /* ignore */ }
-accSel.value = app.ui.accuracy;
-accSel.addEventListener('change', () => { app.ui.accuracy = accSel.value; try { localStorage.setItem('cutcard.acc', accSel.value); } catch (e) { /* ignore */ } app.recompute(); });
 
 import('../trainer/ui.js').then((m) => m.mountTrainer(document.getElementById('trainer'), app));
-if (location.hash.includes('ev')) setTimeout(() => app.openEV(), 400);
+if (location.hash.includes('ev')) setTimeout(() => app.openEV(), 600);
 window.app = app; // handy for debugging in devtools

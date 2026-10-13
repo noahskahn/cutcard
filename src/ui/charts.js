@@ -1,5 +1,5 @@
 // Dependency-free canvas charts (line+bands, bars) with hover read-outs.
-const C = { grid: '#1f2b38', axis: '#5d6c7b', text: '#8b9bab', bg: '#131a22' };
+const C = { grid: 'rgba(233,215,159,.13)', axis: 'rgba(233,215,159,.38)', text: '#c9d4c4', bg: '#131a22' };
 
 function niceTicks(lo, hi, n = 5) {
   if (!(hi > lo)) { hi = lo + 1; }

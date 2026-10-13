@@ -6,6 +6,7 @@ import { makeField } from '../ui/fields.js';
 import { Scene } from './scene.js';
 import { Session } from './session.js';
 import { ACT } from '../core/constants.js';
+import { mistakeBank } from './mistakes.js';
 
 const KEY = 'cutcard.trainer.v1';
 const DEFAULTS = { mode: 'count', cps: 2.5, others: 3, quizFreq: 'round', quizN: 14, quizType: 'running', tol: 1, showCount: false, showTags: false, showLabels: true, devSet: 'i18fab4', devOn: true, focus: 'all' };
@@ -15,7 +16,7 @@ const MODES = {
   both: { title: 'Count + play', sub: 'the real thing', desc: 'Keep the count from the wide view and make every play yourself — with index deviations if you like.' },
 };
 const ACTIONS = [[ACT.HIT, 'Hit', 'H', 'hit'], [ACT.STAND, 'Stand', 'S', 'stand'], [ACT.DOUBLE, 'Double', 'D', 'double'], [ACT.SPLIT, 'Split', 'P', 'split'], [ACT.SURRENDER, 'Surrender', 'R', 'surrender']];
-const camFor = (m) => (m === 'strategy' ? 'close' : 'wide');
+const camFor = (m) => (m === 'strategy' ? 'close' : m === 'both' ? 'both' : 'wide');
 
 export function mountTrainer(root, app) {
   let set = { ...DEFAULTS };
@@ -34,7 +35,7 @@ export function mountTrainer(root, app) {
   const logList = h('div', { class: 'tr-loglist' });
   const log = h('div', { class: 'tr-log', hidden: true }, h('div', { class: 'tr-loghead' }, h('b', {}, 'Decisions'), h('span', {}, 'newest first')), logList);
 
-  const brand = h('div', { class: 'tr-brand' }, h('img', { src: 'assets/logo.svg', width: 34, height: 34, alt: '' }), h('div', {}, h('b', {}, 'Cutcard'), h('span', {}, 'Advantage-play trainer')));
+  const brand = h('div', { class: 'tr-brand' }, h('img', { src: 'assets/logo.svg', width: 24, height: 24, alt: '' }), h('b', {}, 'CUTCARD'));
   const corner = h('div', { class: 'tr-corner' },
     h('button', { class: 'glass', onclick: () => openTutorial() }, 'Tutorial'),
     h('button', { class: 'glass', onclick: () => drawer.classList.toggle('open') }, 'Settings'),
@@ -155,8 +156,16 @@ export function mountTrainer(root, app) {
   function endSession() { statbar.hidden = true; log.hidden = true; session.stop(); scene.banner('', 1); scene._banner.classList.remove('on'); showReview(); }
   function backToTable() { review.hidden = true; scene.clearInstant(); showIdle(); scene.camera(camFor(set.mode), 1600); }
 
+  function mistakesRow() {
+    const n = mistakeBank.count();
+    const on = h('input', { type: 'checkbox' }); on.checked = set.focus === 'mistakes' && n > 0; on.disabled = n === 0;
+    on.addEventListener('change', () => { set.focus = on.checked ? 'mistakes' : 'all'; save(); });
+    return h('label', { class: 'tr-optrow' + (n ? '' : ' dim') }, h('span', { class: 'switch' }, on, h('span')), n ? `Drill only my mistakes (${n} saved)` : 'Drill my mistakes (none saved yet)');
+  }
+  ui.updateMistakes = () => renderOpts();
   function renderOpts() {
     opts.innerHTML = '';
+    if (set.mode !== 'count') opts.append(mistakesRow());
     if (set.mode !== 'both') return;
     const dev = h('input', { type: 'checkbox' }); dev.checked = set.devOn;
     dev.addEventListener('change', () => { set.devOn = dev.checked; save(); renderOpts(); });
@@ -187,6 +196,7 @@ export function mountTrainer(root, app) {
         ...rows.map((r) => h('tr', {}, h('td', {}, r.desc + (r.dev ? ' (index play)' : '')), h('td', {}, [...r.chosen].join(', ')), h('td', {}, r.correct), h('td', {}, String(r.n)), h('td', {}, (r.cost * 100).toFixed(1) + '%')))) : h('p', { class: 'sub' }, 'No mistakes recorded — nice.'),
       h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '18px' } },
         h('button', { class: 'tr-go small', onclick: () => { review.hidden = true; scene.clearInstant(); begin(); } }, 'New session'),
+        mistakeBank.count() ? h('button', { class: 'glass', onclick: () => { set.focus = 'mistakes'; save(); review.hidden = true; scene.clearInstant(); if (set.mode === 'count') setMode('strategy'); begin(); } }, `Drill my ${mistakeBank.count()} mistakes`) : null,
         h('button', { class: 'glass', onclick: backToTable }, 'Back to table'),
         h('button', { class: 'glass accent', onclick: () => { app.openEV({ fromSession: true }); } }, 'Calculate EV from my play ›'))));
   }
@@ -212,7 +222,7 @@ export function mountTrainer(root, app) {
       frow('Question', sel('quizType', [['running', 'Running count'], ['true', 'True count'], ['mixed', 'Mix of both']])),
       frow('True-count tolerance', sel('tol', [[0.5, '± 0.5'], [1, '± 1'], [2, '± 2']])),
       h('h5', {}, 'Play drills'),
-      frow('Hand focus', sel('focus', [['all', 'Everything'], ['hard', 'Hard totals'], ['soft', 'Soft hands'], ['pairs', 'Pairs'], ['double', 'Double-down spots'], ['surrender', 'Surrender spots']])),
+      frow('Hand focus', sel('focus', [['all', 'Everything'], ['mistakes', 'Only my past mistakes'], ['hard', 'Hard totals'], ['soft', 'Soft hands'], ['pairs', 'Pairs'], ['double', 'Double-down spots'], ['surrender', 'Surrender spots']])),
       frow('Hand labels', tog('showLabels')),
       h('h5', {}, 'Training wheels'),
       frow('Show running count', tog('showCount', () => ui.updateCount(session.shoe || { rc: 0, decksEst: 1, tcFloor: 0 }))),
@@ -243,7 +253,16 @@ export function mountTrainer(root, app) {
   });
 
   // EV calculator hooks
-  app.onEVOpen = () => { if (session.tk && !session.paused) session.togglePause(); drawer.classList.remove('open'); };
+  app.onEVOpen = () => {
+    if (session.tk) { session.stop(); scene.clearInstant(); }
+    drawer.classList.remove('open'); review.hidden = true; showIdle();
+    root.classList.add('ev-mode'); stageEl.classList.remove('focus');
+    scene.camera('felt', 2200);                       // dive down into the felt
+  };
+  app.onEVClose = () => {
+    root.classList.remove('ev-mode');
+    session.layoutScene(); scene.camera(camFor(set.mode), 1900);
+  };
   app.getPerformance = () => {
     const s = session.stats;
     return { mode: set.mode, devOn: set.mode === 'both' && set.devOn, devSet: set.devSet, rounds: session.roundNo, quizzes: s.count.n, quizWrong: s.count.n - s.count.ok, decisions: s.strat.n, mistakes: s.strat.n - s.strat.ok };
