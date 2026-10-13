@@ -4,6 +4,9 @@ Static web app (no build step, no dependencies). ES modules + Web Workers + canv
 Run: `npm start` → http://localhost:8080 (or host the folder on any static host). Tests: `npm test`. Strategy cross-check: `npm run verify`.
 Use this file as context instead of reading all source.
 
+## App structure (user view)
+Home screen = the 3D table (`src/trainer/`). Floating controls: Tutorial · Settings · **EV calculator**; bottom launch panel picks the mode (Keep the count / Basic strategy / Count + play with optional index plays) — switching modes glides the camera, **Start** begins. **EV calculator** opens a blurred-background overlay (`#ev`, the former Analyzer dashboard + "More tools" menu). "Use my training performance" / "Calculate EV from my play" converts session accuracy into mistake and count-slip rates (`applySession` in `src/ui/app.js`).
+
 ## Data flow (one paragraph)
 `config` (rules, table, player, costs, spread) → `compileSetup` builds strategy tables (engine) + active deviations →
 `Simulator.runBins` deals millions of flat-bet rounds in Web Workers and records, per **perceived true count bin**, `n, Σx, Σx²` →
@@ -14,7 +17,7 @@ Use this file as context instead of reading all source.
 ## Root
 | File | Purpose |
 |---|---|
-| `index.html` | App shell: header (accuracy, status, Share, Tools menu), `<main>` for the dashboard, modal container for tools. |
+| `index.html` | App shell: `#trainer` (home table), `#ev` (EV calculator overlay with its own bar), tool modal, tutorial container. |
 | `package.json` | `type: module`; scripts `start`, `test`, `verify`. |
 | `README.md` | User/dev quick start & deploy notes. |
 | `PROJECT_MAP.md` | This file. |
@@ -67,7 +70,7 @@ Whole dark theme (CSS variables at top), cards, forms, tables, strategy chart co
 | `dom.js` | `h()` element builder, number formatters, path helpers. |
 | `fields.js` | Declarative inputs bound to config paths (`makeField`, `card`). |
 | `charts.js` | Canvas line/band charts with hover, bar charts, histogram. |
-| `tabs/dashboard.js` | **Home page (no scrolling)**: left = preset + key rules, bet spread, skill (deviation set, count-slip & mistake sliders), bankroll; right = verdict sentence, 5 KPIs, bankroll-over-time fan (theory ±1σ/±2σ, "Verify with dealt cards" overlays 300 dealt-card runs) and edge/profit/bets-by-true-count chart. Links to the tools below for advanced settings. |
+| `tabs/dashboard.js` | **EV calculator main page (no scrolling)**: left = preset + key rules, bet spread, skill (deviation set, count-slip & mistake sliders), bankroll; right = verdict sentence, 5 KPIs, bankroll-over-time fan (theory ±1σ/±2σ, "Verify with dealt cards" overlays 300 dealt-card runs) and edge/profit/bets-by-true-count chart. Links to the tools below for advanced settings. |
 | `tabs/game.js` | Presets, rules, table & pace, costs/rake/comps, copy/paste rules. |
 | `tabs/player.js` | Deviation set, TC rounding, deck estimation, count-error & mistake rates, bankroll, back-counting, per-deviation toggles. |
 | `tabs/results.js` | Spread editor, metrics, spread comparison, EV-by-TC charts, sanity checks. |
@@ -77,14 +80,15 @@ Whole dark theme (CSS variables at top), cards, forms, tables, strategy chart co
 | `tabs/strategy.js` | Generated charts with deviation index tags. |
 | `tabs/help.js` | Quick start, glossary, syntax, method, limits. |
 
-## `src/trainer/` — Trainer (separate view, header switch Analyzer | Trainer; lazy-loaded)
+## `src/trainer/` — Home screen / Trainer
 | File | Purpose |
 |---|---|
 | `shoe.js` | Trainer shoe: lazy shuffle, running count, decks-left estimate, floored true count, rigged draws for drills. |
 | `advisor.js` | Correct-play oracle built on `strategy/` (generated basic strategy for the user's rules + I18/Fab4/engine deviations), legality, hand descriptions, EV cost of mistakes. |
 | `scene.js` | Semi-3D table in pure CSS 3D (perspective plane, rim, felt, vignette); cards, chips, pills, count tags; camera presets (`wide`, `mid`, `close`); all motion via transform/opacity (Web Animations API) so it stays GPU-cheap. |
 | `session.js` | Game flow (deal order, peek, insurance, split/double/surrender, dealer play, settlement), three modes (count / strategy / both), count quizzes (running/true), scoring, mistake log. |
-| `ui.js` | Mode bar, stats, dock (action buttons, quiz inputs, feedback), settings drawer (speed, quiz cadence, drills, training wheels, table rules shared with Analyzer), session review. |
+| `ui.js` | Home UI floating over the table: brand, Tutorial/Settings/EV buttons, mode picker + Start, stats bar, dock (actions, quizzes, feedback), settings drawer, session review; exposes `app.getPerformance()` for the EV calculator. |
+| `tutorial.js` | Interactive 7-step tutorial (Hi-Lo tags, running count, true count, basic strategy, index plays, EV calculator). |
 | `css/trainer.css` | Table, cards, HUD styling. |
 
 ## `tests/` (`npm test`, Node ≥ 18)

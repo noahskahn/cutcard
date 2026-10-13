@@ -52,6 +52,7 @@ export const app = {
   setCfg(cfg) { this.cfg = cfg; this.save(); this.syncFields(); this.emit('cfg'); this.recompute(); },
   change(path) {
     this.save(); this.syncFields();
+    if (!this._applying && /^player\.(countErrorRate|mistakeRate|deviations)/.test(path)) this.sessionNote = null;
     this.emit('cfg');
     if (this.trainerActive) { this.dirty = true; return; }
     const light = /^(spread|player\.(bankroll|wongOutBelow)|table\.(roundsPerHour|increment)|costs\.(hourlyCost|rakePerHand|compPct))/.test(path);
@@ -117,7 +118,7 @@ let active = null;
 
 function closeTool() { active = null; document.getElementById('modal').hidden = true; }
 function show(id) {
-  if (id === 'home') return closeTool();
+  if (id === 'home') { closeTool(); return; }
   const tool = TOOLS.find(([t]) => t === id); if (!tool) return;
   active = id;
   const body = document.getElementById('mbody');
@@ -129,13 +130,43 @@ function show(id) {
   mounted[id].api.update && mounted[id].api.update();
 }
 app.show = show;
-const dash = h('div');
-document.getElementById('main').append(dash);
-dashTab.mount(dash, app);
-
 function updateActive() { if (active && mounted[active]?.api.update) mounted[active].api.update(); }
 app.on('stats', updateActive);
 app.on('analysis', updateActive);
+
+// ---- EV calculator overlay (blurred background); the table (trainer) is the home screen ----
+const evEl = document.getElementById('ev');
+let dashMounted = false;
+app.trainerActive = true;
+
+/** Turn the user's training-session performance into skill settings for the EV model. */
+function applySession() {
+  const p = app.getPerformance && app.getPerformance();
+  const note = document.getElementById('useSession');
+  if (!p || (p.decisions < 8 && p.quizzes < 3)) { note.textContent = 'Play a session first'; setTimeout(() => (note.textContent = 'Use my training performance'), 2200); return false; }
+  const pl = app.cfg.player, parts = [];
+  if (p.decisions >= 8) { pl.mistakeRate = Math.round((p.mistakes / p.decisions) * 1000) / 1000; parts.push(`${(pl.mistakeRate * 100).toFixed(1)}% wrong plays`); }
+  if (p.quizzes >= 3 && p.mode !== 'strategy') { pl.countErrorRate = Math.min(0.3, Math.round((p.quizWrong / Math.max(1, p.rounds)) * 1000) / 1000); parts.push(`${(pl.countErrorRate * 100).toFixed(1)}% count slips per round`); }
+  pl.deviations = p.mode === 'both' && p.devOn ? p.devSet : 'none';
+  app._applying = true; app.change('player.mistakeRate'); app._applying = false;
+  app.sessionNote = `From your last training session (${p.mode === 'both' ? 'count + plays' : p.mode === 'count' ? 'counting' : 'strategy'}): ${parts.join(' · ') || 'basic strategy'}`;
+  app.emit('cfg');
+  return true;
+}
+app.openEV = (opts = {}) => {
+  evEl.hidden = false; app.trainerActive = false; document.body.classList.add('ev-open');
+  if (!dashMounted) { dashTab.mount(document.getElementById('main'), app); dashMounted = true; }
+  if (opts.fromSession) applySession();
+  if (app.dirty || !app.stats) { app.dirty = false; app.recompute(); } else { app.emit('analysis'); app.setBusy(false); }
+  app.onEVOpen && app.onEVOpen();
+};
+app.closeEV = () => {
+  closeTool(); evEl.hidden = true; app.trainerActive = true; document.body.classList.remove('ev-open');
+  if (app.busy) { app.pool.cancel(); app.seq++; app.setBusy(false); app.dirty = true; }
+  app.onEVClose && app.onEVClose();
+};
+document.getElementById('evClose').addEventListener('click', () => app.closeEV());
+document.getElementById('useSession').addEventListener('click', applySession);
 
 const menu = document.getElementById('toolsMenu');
 for (const [id, title, , sub] of TOOLS) menu.append(h('button', { onclick: () => { menu.classList.remove('open'); show(id); } }, h('b', {}, title), h('small', {}, sub)));
@@ -143,40 +174,17 @@ document.getElementById('toolsBtn').addEventListener('click', (e) => { e.stopPro
 document.addEventListener('click', () => menu.classList.remove('open'));
 document.getElementById('mclose').addEventListener('click', closeTool);
 document.getElementById('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeTool(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTool(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (active) closeTool(); else if (!evEl.hidden) app.closeEV(); } });
 document.getElementById('shareBtn').addEventListener('click', async (e) => {
   const b = e.currentTarget;
   try { await navigator.clipboard.writeText(app.shareLink()); b.textContent = 'Link copied ✓'; } catch (err) { b.textContent = 'Copy failed'; }
   setTimeout(() => (b.textContent = 'Share'), 2000);
 });
-
 const accSel = document.getElementById('accuracy');
 try { const a = localStorage.getItem('cutcard.acc'); if (a && ACCURACY[a]) app.ui.accuracy = a; } catch (e) { /* ignore */ }
 accSel.value = app.ui.accuracy;
 accSel.addEventListener('change', () => { app.ui.accuracy = accSel.value; try { localStorage.setItem('cutcard.acc', accSel.value); } catch (e) { /* ignore */ } app.recompute(); });
-app.recompute();
 
-// ---- Analyzer / Trainer view switch (trainer loads lazily; analyzer work pauses while training)
-let trainerApi = null;
-async function setView(v) {
-  const tr = v === 'trainer';
-  document.body.classList.toggle('view-trainer', tr);
-  document.getElementById('vAn').classList.toggle('on', !tr);
-  document.getElementById('vTr').classList.toggle('on', tr);
-  app.trainerActive = tr;
-  if (tr) {
-    closeTool();
-    if (app.busy) { app.pool.cancel(); app.seq++; app.setBusy(false); app.dirty = true; }
-    if (!trainerApi) { const m = await import('../trainer/ui.js'); trainerApi = m.mountTrainer(document.getElementById('trainer'), app); }
-    trainerApi.show();
-  } else {
-    if (trainerApi) trainerApi.hide();
-    if (app.dirty || !app.stats) { app.dirty = false; app.recompute(); }
-    window.dispatchEvent(new Event('resize'));
-  }
-  try { localStorage.setItem('cutcard.view', v); } catch (e) { /* ignore */ }
-}
-document.getElementById('vAn').addEventListener('click', () => setView('analyzer'));
-document.getElementById('vTr').addEventListener('click', () => setView('trainer'));
-if (location.hash.includes('trainer')) setView('trainer');
+import('../trainer/ui.js').then((m) => m.mountTrainer(document.getElementById('trainer'), app));
+if (location.hash.includes('ev')) setTimeout(() => app.openEV(), 400);
 window.app = app; // handy for debugging in devtools

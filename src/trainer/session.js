@@ -22,6 +22,8 @@ export class Session {
     return { count: { n: 0, ok: 0, streak: 0, best: 0, errs: [], times: [] }, strat: { n: 0, ok: 0, streak: 0, best: 0, mistakes: [] }, started: Date.now() };
   }
 
+  get useDev() { return this.set.mode === 'both' && this.set.devOn !== false; }
+
   // ----------------------------------------------------------------- lifecycle
   configure() {
     const R = this.getRules();
@@ -156,11 +158,11 @@ export class Session {
       this.camera('decide', 1200); this._deciding = true;
       const want = await this.ui.ask('Dealer shows an ace — take insurance?', 'yesno');
       this.g(tk);
-      const right = set.mode === 'both' ? this.adv.insuranceCorrect(tcNow) : false;
+      const right = this.useDev ? this.adv.insuranceCorrect(tcNow) : false;
       const ok = want === right;
       this.record('strat', ok, { desc: 'Insurance vs A', chosen: want ? 'Take it' : 'Decline', correct: right ? 'Take it' : 'Decline', cost: ok ? 0 : 0.07, dev: set.mode === 'both' });
       this.ui.feedback(ok ? 'ok' : 'bad', ok ? (right ? 'Correct — take insurance' : 'Correct — never insure') : right ? 'Take insurance' : 'Decline insurance',
-        set.mode === 'both' ? `Index +${this.adv.insIdx ?? 3} · your true count is ${tcNow >= 0 ? '+' : ''}${tcNow}` : 'Basic strategy: insurance is a losing bet without the count');
+        this.useDev ? `Index +${this.adv.insIdx ?? 3} · your true count is ${tcNow >= 0 ? '+' : ''}${tcNow}` : 'Basic strategy: insurance is a losing bet without the count');
       await this.w(ok ? 900 : 1900, tk);
     }
     // dealer peek
@@ -290,7 +292,7 @@ export class Session {
   // ----------------------------------------------------------------- interaction
   async askAction(tk, hand, nHands) {
     const { adv, shoe, set, up } = this;
-    const useDev = set.mode === 'both';
+    const useDev = this.useDev;
     const tc = shoe.tcFloor;
     const lg = adv.legal(hand, up, nHands);
     const correct = adv.advise(hand, up, nHands, tc, useDev);

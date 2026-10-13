@@ -1,4 +1,6 @@
-// Trainer UI: top bar, HUD, dock (actions / quizzes / feedback), settings drawer, review.
+// Home screen: the 3D table fills the page; everything else floats on top of it.
+//   brand (top-left) · tutorial / settings / EV calculator (top-right) · mode picker + Start (bottom)
+//   while training: stats bar, action buttons, quizzes, feedback.
 import { h } from '../ui/dom.js';
 import { makeField } from '../ui/fields.js';
 import { Scene } from './scene.js';
@@ -6,18 +8,20 @@ import { Session } from './session.js';
 import { ACT } from '../core/constants.js';
 
 const KEY = 'cutcard.trainer.v1';
-const DEFAULTS = { mode: 'count', cps: 2.5, others: 3, quizFreq: 'round', quizN: 14, quizType: 'running', tol: 1, showCount: false, showTags: false, showLabels: true, devSet: 'i18fab4', focus: 'all' };
+const DEFAULTS = { mode: 'count', cps: 2.5, others: 3, quizFreq: 'round', quizN: 14, quizType: 'running', tol: 1, showCount: false, showTags: false, showLabels: true, devSet: 'i18fab4', devOn: true, focus: 'all' };
 const MODES = {
-  count: ['Keep the count', 'Hi-Lo quizzes', 'Watch the whole table deal and keep the Hi-Lo running count in your head. You will be quizzed along the way.'],
-  strategy: ['Basic strategy', 'zoomed in', 'The camera swoops in on your hand. Choose the correct play for every hand — you will see what each mistake costs.'],
-  both: ['Count + deviations', 'the full game', 'Keep the count from the wide view, then make every play using index deviations from your own true count.'],
+  count: { title: 'Keep the count', sub: 'Hi-Lo running & true count', desc: 'Watch the whole table deal and keep the Hi-Lo count in your head. You’ll be quizzed along the way.' },
+  strategy: { title: 'Basic strategy', sub: 'zoomed in on your hand', desc: 'The camera moves in on your hand and the dealer’s. Pick the right play every time and see what each mistake costs.' },
+  both: { title: 'Count + play', sub: 'the real thing', desc: 'Keep the count from the wide view and make every play yourself — with index deviations if you like.' },
 };
 const ACTIONS = [[ACT.HIT, 'Hit', 'H', 'hit'], [ACT.STAND, 'Stand', 'S', 'stand'], [ACT.DOUBLE, 'Double', 'D', 'double'], [ACT.SPLIT, 'Split', 'P', 'split'], [ACT.SURRENDER, 'Surrender', 'R', 'surrender']];
+const camFor = (m) => (m === 'strategy' ? 'close' : 'wide');
 
 export function mountTrainer(root, app) {
   let set = { ...DEFAULTS };
   try { Object.assign(set, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { /* ignore */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(set)); } catch (e) { /* ignore */ } };
+  root.className = 'tr-root';
 
   // ---------------- structure
   const stageEl = h('div', { class: 'tr-stage' });
@@ -26,25 +30,39 @@ export function mountTrainer(root, app) {
   const panel = h('div', { class: 'tr-panelslot' });
   const dock = h('div', { class: 'tr-dock' }, fb, panel);
   const drawer = h('div', { class: 'tr-drawer' });
-  const startBox = h('div', { class: 'tr-start' });
   const review = h('div', { class: 'tr-review', hidden: true });
-  const modeBtns = Object.entries(MODES).map(([k, [t, sub]]) => h('button', { 'data-m': k, onclick: () => setMode(k) }, t, h('small', {}, sub)));
+
+  const brand = h('div', { class: 'tr-brand' }, h('img', { src: 'assets/logo.svg', width: 34, height: 34, alt: '' }), h('div', {}, h('b', {}, 'Cutcard'), h('span', {}, 'Advantage-play trainer')));
+  const corner = h('div', { class: 'tr-corner' },
+    h('button', { class: 'glass', onclick: () => openTutorial() }, 'Tutorial'),
+    h('button', { class: 'glass', onclick: () => drawer.classList.toggle('open') }, 'Settings'),
+    h('button', { class: 'glass accent', onclick: () => app.openEV() }, 'EV calculator ›'));
+
+  // stats bar (visible while training)
   const statAcc = h('b', {}, '—'), statPlay = h('b', {}, '—'), statStreak = h('b', {}, '0');
-  const pauseBtn = h('button', { class: 'btn small', onclick: () => session.togglePause() }, 'Pause');
-  const top = h('div', { class: 'tr-top' }, h('div', { class: 'tr-modes' }, modeBtns),
-    h('div', { class: 'tr-stats' },
-      h('div', { class: 'tr-stat' }, h('label', {}, 'Count accuracy'), statAcc),
-      h('div', { class: 'tr-stat' }, h('label', {}, 'Play accuracy'), statPlay),
-      h('div', { class: 'tr-stat' }, h('label', {}, 'Streak'), statStreak),
-      pauseBtn,
-      h('button', { class: 'btn small', onclick: () => drawer.classList.toggle('open') }, 'Settings'),
-      h('button', { class: 'btn small', onclick: () => endSession() }, 'End & review')));
-  root.append(h('div', { class: 'tr-root' }, top, h('div', { class: 'tr-body' }, stageEl, hud, dock, drawer, startBox, review)));
+  const modeLbl = h('b', {});
+  const pauseBtn = h('button', { class: 'glass', onclick: () => session.togglePause() }, 'Pause');
+  const statbar = h('div', { class: 'tr-statbar', hidden: true },
+    h('div', { class: 'tr-stat' }, h('label', {}, 'Mode'), modeLbl),
+    h('div', { class: 'tr-stat' }, h('label', {}, 'Count'), statAcc),
+    h('div', { class: 'tr-stat' }, h('label', {}, 'Plays'), statPlay),
+    h('div', { class: 'tr-stat' }, h('label', {}, 'Streak'), statStreak),
+    pauseBtn, h('button', { class: 'glass', onclick: () => endSession() }, 'End'));
+
+  // launch panel (visible while idle)
+  const modeCards = Object.entries(MODES).map(([k, m]) => h('button', { class: 'tr-mode', 'data-m': k, onclick: () => setMode(k) }, h('b', {}, m.title), h('span', {}, m.sub)));
+  const desc = h('p', { class: 'tr-desc' });
+  const opts = h('div', { class: 'tr-opts' });
+  const hint = h('button', { class: 'tr-newhere', onclick: () => openTutorial() }, 'New here? Take the 2-minute tutorial →');
+  const launch = h('div', { class: 'tr-launch' }, hint, h('div', { class: 'tr-modes3' }, modeCards), desc, opts,
+    h('button', { class: 'tr-go', onclick: () => begin() }, 'Start training'));
+
+  root.append(h('div', { class: 'tr-body' }, stageEl, hud, brand, corner, statbar, dock, launch, drawer, review));
 
   const scene = new Scene(stageEl);
   const ui = {
     clearDock(keepFb) { panel.innerHTML = ''; if (!keepFb) fb.classList.remove('on'); },
-    onPause(p) { pauseBtn.textContent = p ? 'Resume' : 'Pause'; scene.banner(p ? 'Paused' : '', p ? 60000 : 1); if (!p) scene._banner.classList.remove('on'); },
+    onPause(p) { pauseBtn.textContent = p ? 'Resume' : 'Pause'; if (p) scene.banner('Paused — press Space', 600000); else scene._banner.classList.remove('on'); },
     updateCount(shoe) {
       hud.innerHTML = '';
       if (!set.showCount || set.mode === 'strategy') return;
@@ -54,8 +72,7 @@ export function mountTrainer(root, app) {
     },
     updateStats(s) {
       const pct = (o) => (o.n ? Math.round((o.ok / o.n) * 100) + '%' : '—');
-      statAcc.textContent = pct(s.count) + (s.count.n ? ` (${s.count.n})` : '');
-      statPlay.textContent = pct(s.strat) + (s.strat.n ? ` (${s.strat.n})` : '');
+      statAcc.textContent = pct(s.count); statPlay.textContent = pct(s.strat);
       statStreak.textContent = (s.streak || 0) + (s.best ? ` · best ${s.best}` : '');
     },
     feedback(kind, title, small) {
@@ -64,7 +81,7 @@ export function mountTrainer(root, app) {
       fb.append(title); if (small) fb.append(h('small', {}, small));
     },
     shake() { stageEl.classList.remove('tr-shake'); void stageEl.offsetWidth; stageEl.classList.add('tr-shake'); },
-    ask(prompt, type, hint) {
+    ask(prompt, type, hintTxt) {
       return new Promise((resolve) => {
         panel.innerHTML = '';
         if (type === 'yesno') {
@@ -79,7 +96,7 @@ export function mountTrainer(root, app) {
         const inp = h('input', { type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0' });
         const go = () => { const v = parseFloat(inp.value.replace('−', '-')); if (Number.isFinite(v)) resolve(v); };
         inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); e.stopPropagation(); });
-        panel.append(h('div', { class: 'tr-quiz' }, h('h4', {}, prompt), h('div', { class: 'row' }, inp, h('button', { class: 'btn primary', onclick: go }, 'Submit')), hint ? h('small', {}, hint) : null));
+        panel.append(h('div', { class: 'tr-quiz' }, h('h4', {}, prompt), h('div', { class: 'row' }, inp, h('button', { class: 'btn primary', onclick: go }, 'Submit')), hintTxt ? h('small', {}, hintTxt) : null));
         setTimeout(() => inp.focus(), 30);
       });
     },
@@ -94,8 +111,7 @@ export function mountTrainer(root, app) {
         });
         const keyh = (e) => {
           if (e.target.tagName === 'INPUT') return;
-          const k = e.key.toUpperCase();
-          const hit = btns.find(([, kk]) => kk === k); if (hit && !hit[2].disabled) pick(hit[0]);
+          const k = e.key.toUpperCase(); const hit = btns.find(([, kk]) => kk === k); if (hit && !hit[2].disabled) pick(hit[0]);
         };
         document.addEventListener('keydown', keyh);
         panel.append(h('div', { class: 'tr-actions' }, btns.map((b) => b[2])));
@@ -105,35 +121,51 @@ export function mountTrainer(root, app) {
 
   const session = new Session({ scene, ui, settings: set, getRules: () => app.cfg.rules });
 
-  // ---------------- controls
+  // ---------------- state transitions
+  function showIdle() {
+    statbar.hidden = true; launch.hidden = false; hud.innerHTML = ''; ui.clearDock(); session.paused = false; pauseBtn.textContent = 'Pause';
+    scene._banner.classList.remove('on');
+  }
   function setMode(m) {
-    set.mode = m; save(); markModes();
-    if (session.tk) { session.setMode(m); ui.updateCount(session.shoe); }
-    renderStart(); renderDrawer();
+    const changed = m !== set.mode, was = !!session.tk;
+    if (was) { session.stop(); scene.clearInstant(); review.hidden = true; }
+    set.mode = m; save(); markModes(); renderOpts(); showIdle();
+    if (changed || was) scene.camera(camFor(m), 2000);   // camera glides to the new mode's view
   }
-  function markModes() { modeBtns.forEach((b) => b.classList.toggle('on', b.dataset.m === set.mode)); }
-  function begin() { startBox.hidden = true; review.hidden = true; session.stats = session.freshStats(); ui.updateStats(session.stats); session.start(); }
-  function renderStart() {
-    const [t, , d] = MODES[set.mode];
-    startBox.innerHTML = '';
-    startBox.append(h('div', { class: 'box' }, h('h2', {}, t), h('p', {}, d),
-      h('p', { style: { fontSize: '12px' } }, 'Uses the rules from your Analyzer game. Space pauses · H S D P R to play · Enter submits a count.'),
-      h('button', { class: 'btn primary', onclick: begin }, 'Start training')));
+  function markModes() { modeCards.forEach((b) => b.classList.toggle('on', b.dataset.m === set.mode)); desc.textContent = MODES[set.mode].desc; }
+  function begin() {
+    review.hidden = true; launch.hidden = true; statbar.hidden = false;
+    modeLbl.textContent = MODES[set.mode].title;
+    session.stats = session.freshStats(); session.roundNo = 0; ui.updateStats(session.stats);
+    try { localStorage.setItem('cutcard.tut', localStorage.getItem('cutcard.tut') || 'skipped'); } catch (e) { /* ignore */ }
+    session.start();
   }
-  function endSession() {
-    if (!session.tk && startBox.hidden === false) return;
-    session.stop(); scene.banner('', 1); showReview();
+  function endSession() { statbar.hidden = true; session.stop(); scene.banner('', 1); scene._banner.classList.remove('on'); showReview(); }
+  function backToTable() { review.hidden = true; scene.clearInstant(); showIdle(); scene.camera(camFor(set.mode), 1600); }
+
+  function renderOpts() {
+    opts.innerHTML = '';
+    if (set.mode !== 'both') return;
+    const dev = h('input', { type: 'checkbox' }); dev.checked = set.devOn;
+    dev.addEventListener('change', () => { set.devOn = dev.checked; save(); renderOpts(); });
+    const sel = h('select', {}, [['i18', 'Illustrious 18'], ['i18fab4', 'Illustrious 18 + Fab 4'], ['full', 'Extended set'], ['engine', 'Full engine set']].map(([v, l]) => h('option', { value: v }, l)));
+    sel.value = set.devSet; sel.addEventListener('change', () => { set.devSet = sel.value; save(); });
+    opts.append(h('label', { class: 'tr-optrow' }, h('span', { class: 'switch' }, dev, h('span')), 'Include index plays (deviations)'));
+    if (set.devOn) opts.append(sel);
   }
+
+  // ---------------- session review
   function showReview() {
     const s = session.stats, c = s.count;
     const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
     const agg = new Map();
     for (const m of s.strat.mistakes) { const k = `${m.desc}|${m.correct}`; const e = agg.get(k) || { ...m, n: 0, cost: 0, chosen: new Set() }; e.n++; e.cost += m.cost; e.chosen.add(m.chosen); agg.set(k, e); }
-    const rows = [...agg.values()].sort((a, b) => b.cost - a.cost || b.n - a.n).slice(0, 12);
+    const rows = [...agg.values()].sort((a, b) => b.cost - a.cost || b.n - a.n).slice(0, 10);
     const mins = ((Date.now() - s.started) / 60000).toFixed(1);
+    const kcard = (l, v, sub) => h('div', { class: 'kpi', style: { '--c': '#4cc9a0' } }, h('label', {}, l), h('b', {}, v), h('small', {}, sub));
     review.innerHTML = ''; review.hidden = false;
-    review.append(h('div', { style: { maxWidth: '760px', margin: '0 auto' } },
-      h('h2', { style: { margin: '0 0 4px' } }, 'Session review'),
+    review.append(h('div', { class: 'tr-reviewbox' },
+      h('h2', {}, 'Session review'),
       h('p', { class: 'sub' }, `${mins} min · ${c.n} count quizzes · ${s.strat.n} play decisions · best streak ${s.best || 0}`),
       h('div', { class: 'grid g3' },
         kcard('Count accuracy', c.n ? Math.round((c.ok / c.n) * 100) + '%' : '—', c.n ? `avg response ${avg(c.times).toFixed(1)}s` : 'no count quizzes'),
@@ -141,16 +173,17 @@ export function mountTrainer(root, app) {
         kcard('EV given away', `${(s.strat.mistakes.reduce((a, m) => a + m.cost, 0) * 100).toFixed(1)}%`, 'of one bet in total')),
       rows.length ? h('table', { class: 't' }, h('tr', {}, ...['Spot', 'You played', 'Correct', 'Times', 'EV lost'].map((x) => h('th', {}, x))),
         ...rows.map((r) => h('tr', {}, h('td', {}, r.desc + (r.dev ? ' (index play)' : '')), h('td', {}, [...r.chosen].join(', ')), h('td', {}, r.correct), h('td', {}, String(r.n)), h('td', {}, (r.cost * 100).toFixed(1) + '%')))) : h('p', { class: 'sub' }, 'No mistakes recorded — nice.'),
-      h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '16px' } },
-        h('button', { class: 'btn primary', onclick: begin }, 'New session'), h('button', { class: 'btn', onclick: () => { review.hidden = true; startBox.hidden = false; } }, 'Back'))));
+      h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '18px' } },
+        h('button', { class: 'tr-go small', onclick: () => { review.hidden = true; scene.clearInstant(); begin(); } }, 'New session'),
+        h('button', { class: 'glass', onclick: backToTable }, 'Back to table'),
+        h('button', { class: 'glass accent', onclick: () => { app.openEV({ fromSession: true }); } }, 'Calculate EV from my play ›'))));
   }
-  const kcard = (l, v, s) => h('div', { class: 'kpi', style: { '--c': '#4cc9a0' } }, h('label', {}, l), h('b', {}, v), h('small', {}, s));
 
   // ---------------- settings drawer
-  const sel = (key, opts, after) => { const s = h('select', {}, opts.map(([v, l]) => h('option', { value: String(v) }, l))); s.value = String(set[key]); s.addEventListener('change', () => { const o = opts.find(([v]) => String(v) === s.value); set[key] = o[0]; save(); after && after(); renderDrawer(); }); return s; };
+  const sel = (key, optsList, after) => { const s = h('select', {}, optsList.map(([v, l]) => h('option', { value: String(v) }, l))); s.value = String(set[key]); s.addEventListener('change', () => { const o = optsList.find(([v]) => String(v) === s.value); set[key] = o[0]; save(); after && after(); renderDrawer(); }); return s; };
   const tog = (key, after) => { const i = h('input', { type: 'checkbox' }); i.checked = !!set[key]; i.addEventListener('change', () => { set[key] = i.checked; save(); after && after(); }); return h('label', { class: 'switch' }, i, h('span')); };
-  const frow = (label, ctl, hint) => h('div', { class: 'field' }, h('label', {}, label), ctl, hint ? h('div', { class: 'hint' }, hint) : null);
-  const restart = () => { if (session.tk) { clearTimeout(restart.t); restart.t = setTimeout(() => session.start(), 400); } };
+  const frow = (label, ctl, hintTxt) => h('div', { class: 'field' }, h('label', {}, label), ctl, hintTxt ? h('div', { class: 'hint' }, hintTxt) : null);
+  const restart = () => { clearTimeout(restart.t); restart.t = setTimeout(() => { if (session.tk) { session.stop(); scene.clearInstant(); } scene.setSeats(set.others + 1, Math.floor((set.others + 1) / 2)); scene.setRules({ bjPay: app.cfg.rules.bjPay, h17: app.cfg.rules.h17, penetration: app.cfg.rules.penetration }); showIdle(); }, 400); };
   const cpsOut = h('b', {});
   function renderDrawer() {
     drawer.innerHTML = '';
@@ -159,7 +192,7 @@ export function mountTrainer(root, app) {
     cps.addEventListener('input', () => { set.cps = +cps.value; cpsOut.textContent = set.cps + ' cards/s'; session.applySpeed(); });
     cps.addEventListener('change', save);
     const items = [
-      h('div', { class: 'row sp' }, h('b', {}, 'Trainer settings'), h('button', { class: 'btn small', onclick: () => drawer.classList.remove('open') }, 'Close')),
+      h('div', { class: 'row sp' }, h('b', {}, 'Settings'), h('button', { class: 'glass', onclick: () => drawer.classList.remove('open') }, 'Close')),
       h('h5', {}, 'Pace'), h('div', { class: 'row sp' }, h('label', {}, 'Dealing speed'), cpsOut), cps,
       h('h5', {}, 'Count quizzes'),
       frow('Ask', sel('quizFreq', [['round', 'End of every round'], ['cards', 'Every N cards'], ['random', 'Random moment each round']])),
@@ -168,7 +201,6 @@ export function mountTrainer(root, app) {
       frow('True-count tolerance', sel('tol', [[0.5, '± 0.5'], [1, '± 1'], [2, '± 2']])),
       h('h5', {}, 'Play drills'),
       frow('Hand focus', sel('focus', [['all', 'Everything'], ['hard', 'Hard totals'], ['soft', 'Soft hands'], ['pairs', 'Pairs'], ['double', 'Double-down spots'], ['surrender', 'Surrender spots']])),
-      frow('Index plays', sel('devSet', [['i18fab4', 'Illustrious 18 + Fab 4'], ['i18', 'Illustrious 18'], ['full', 'Extended published set'], ['engine', 'Full engine set']], restart), 'Used in "Count + deviations".'),
       frow('Hand labels', tog('showLabels')),
       h('h5', {}, 'Training wheels'),
       frow('Show running count', tog('showCount', () => ui.updateCount(session.shoe || { rc: 0, decksEst: 1, tcFloor: 0 }))),
@@ -181,24 +213,35 @@ export function mountTrainer(root, app) {
       makeField(app, { path: 'rules.das', label: 'Double after split', type: 'bool' }),
       makeField(app, { path: 'rules.surrender', label: 'Surrender', type: 'select', options: [['none', 'None'], ['late', 'Late'], ['early', 'Early']] }),
       makeField(app, { path: 'rules.bjPay', label: 'Blackjack pays', type: 'select', options: [[1.5, '3:2'], [1.2, '6:5']] }),
-      h('p', { class: 'sub', style: { marginTop: '10px' } }, 'Rule changes are shared with the Analyzer.')];
+      h('p', { class: 'sub', style: { marginTop: '10px' } }, 'Table rules are shared with the EV calculator.')];
     drawer.append(...items.filter(Boolean));
   }
 
-  // restart when rules change
+  async function openTutorial() {
+    const m = await import('./tutorial.js');
+    m.openTutorial(app, { onFinish: () => {}, startTraining: () => { setMode('count'); begin(); } });
+  }
+
+  // rule changes rebuild the table; any running session returns to idle
   app.on('cfg', () => { if (app.trainerActive) restart(); });
   document.addEventListener('keydown', (e) => {
     if (!app.trainerActive || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
     if (e.code === 'Space' && session.tk) { e.preventDefault(); session.togglePause(); }
+    if (e.code === 'Enter' && !launch.hidden && review.hidden) begin();
   });
 
+  // EV calculator hooks
+  app.onEVOpen = () => { if (session.tk && !session.paused) session.togglePause(); drawer.classList.remove('open'); };
+  app.getPerformance = () => {
+    const s = session.stats;
+    return { mode: set.mode, devOn: set.mode === 'both' && set.devOn, devSet: set.devSet, rounds: session.roundNo, quizzes: s.count.n, quizWrong: s.count.n - s.count.ok, decisions: s.strat.n, mistakes: s.strat.n - s.strat.ok };
+  };
+
   window.__trainer = { session, scene, set };
-  markModes(); renderStart(); renderDrawer(); ui.updateStats(session.stats);
+  markModes(); renderOpts(); renderDrawer(); ui.updateStats(session.stats);
+  let seen = null; try { seen = localStorage.getItem('cutcard.tut'); } catch (e) { /* ignore */ }
+  hint.hidden = !!seen;
   scene.setRules({ bjPay: app.cfg.rules.bjPay, h17: app.cfg.rules.h17, penetration: app.cfg.rules.penetration });
   scene.setSeats(set.others + 1, Math.floor((set.others + 1) / 2));
-  scene.camera(set.mode === 'strategy' ? 'close' : 'wide', 0);
-  return {
-    show() { scene.camera(set.mode === 'strategy' ? 'close' : 'wide', 0); },
-    hide() { if (session.tk) { session.stop(); startBox.hidden = false; renderStart(); } },
-  };
+  scene.camera(camFor(set.mode), 0);
 }

@@ -9,7 +9,7 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export const CAMERAS = {
-  wide:  { rx: 50, s: 1.0,  ty: 10 },
+  wide:  { rx: 50, s: 0.9,  ty: -52 },
   mid:   { rx: 44, s: 1.05, ty: -30 },
   close: { rx: 37, s: 1.1, ty: -78 },
 };
@@ -208,6 +208,14 @@ export class Scene {
     this.dealer.hands = [this._newHand(PW / 2, 168)];
     this.seats.forEach((s) => { s.hands = [this._newHand(s.x, s.y - 40)]; });
     this.clearBets();
+  }
+
+  /** Instantly empty the table (used when a session is stopped or the mode changes). */
+  clearInstant() {
+    this.cardLayer.innerHTML = ''; this.fxLayer.innerHTML = '';
+    this.dealer.hands = [this._newHand(PW / 2, 168)];
+    this.seats.forEach((s) => { s.hands = [this._newHand(s.x, s.y - 40)]; });
+    this.clearBets(); this._banner.classList.remove('on'); this.setStacks(1);
   }
 
   setStacks(fracRemaining) {

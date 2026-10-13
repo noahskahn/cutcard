@@ -3,25 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cutcard — Blackjack Advantage-Play Analytics</title>
-<meta name="description" content="Blackjack card counting calculator: custom rules, bet spreads, EV, risk of ruin and Monte Carlo bankroll simulations.">
+<title>Cutcard — Blackjack Advantage-Play Trainer &amp; Analytics</title>
+<meta name="description" content="Train card counting, basic strategy and index plays at a 3D table, then calculate EV, risk of ruin and bankroll outcomes.">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/trainer.css">
 </head>
 <body>
-<header class="top">
-  <div class="brand"><img src="assets/logo.svg" alt="" width="34" height="34"><div><b>Cutcard</b><span>Advantage-play analytics</span></div></div>
-  <div class="viewnav"><button id="vAn" class="on">Analyzer</button><button id="vTr">Trainer</button></div>
-  <div class="grow"></div>
-  <label class="acc an-only" title="Rounds simulated per game setup. Higher = smoother statistics, slower.">Accuracy <select id="accuracy"><option value="quick">Quick (1M)</option><option value="standard">Standard (4M)</option><option value="high">High (20M)</option></select></label>
-  <div class="status an-only" id="status"><span class="dot"></span><span id="statusText">Ready</span></div>
-  <button class="btn small an-only" id="shareBtn" title="Copy a link to this exact setup">Share</button>
-  <div class="menuwrap an-only"><button class="btn small primary" id="toolsBtn">Tools &#9662;</button><div class="menu" id="toolsMenu"></div></div>
-</header>
-<main id="main"></main>
 <div id="trainer"></div>
+
+<div class="ev-overlay" id="ev" hidden>
+  <div class="ev-panel">
+    <div class="ev-bar">
+      <div class="ev-title"><img src="assets/logo.svg" alt="" width="26" height="26"><div><b>EV calculator</b><span>expected value · risk of ruin · bankroll</span></div></div>
+      <div class="grow"></div>
+      <button class="btn small" id="useSession" title="Fill in your count slips and wrong-play rates from your last training session">Use my training performance</button>
+      <label class="acc" title="Rounds simulated per game setup. Higher = smoother statistics, slower.">Accuracy <select id="accuracy"><option value="quick">Quick (1M)</option><option value="standard">Standard (4M)</option><option value="high">High (20M)</option></select></label>
+      <div class="status" id="status"><span class="dot"></span><span id="statusText">Ready</span></div>
+      <button class="btn small" id="shareBtn" title="Copy a link to this exact setup">Share</button>
+      <div class="menuwrap"><button class="btn small" id="toolsBtn">More tools &#9662;</button><div class="menu" id="toolsMenu"></div></div>
+      <button class="btn small primary" id="evClose">Back to table</button>
+    </div>
+    <main id="main"></main>
+  </div>
+</div>
+
 <div class="modal" id="modal" hidden><div class="mpanel"><div class="mhead"><b id="mtitle"></b><button class="btn small" id="mclose">Close ✕</button></div><div class="mbody" id="mbody"></div></div></div>
+<div class="tut" id="tutorial" hidden></div>
 <script type="module" src="src/ui/app.js"></script>
 </body>
 </html>

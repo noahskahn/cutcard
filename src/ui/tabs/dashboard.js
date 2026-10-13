@@ -46,6 +46,7 @@ export function mount(root, app) {
   const spreadBtns = h('div', { class: 'chips' }, ...['1-4', '1-8', '1-12', '1-16', 'Flat'].map((k) =>
     h('button', { class: 'chip', onclick: () => { app.cfg.spread.bets = [...SPREAD_PRESETS[k]]; app.change('spread.bets'); } }, k)));
 
+  const sessNote = h('div', { class: 'sessnote', hidden: true });
   const left = h('aside', { class: 'side' },
     h('section', { class: 'blk' }, h('h4', {}, '1 · Game'), presetSel,
       h('div', { class: 'mini' },
@@ -58,7 +59,7 @@ export function mount(root, app) {
       h('button', { class: 'link', onclick: () => app.show('game') }, 'All rules, table limits, costs & paste/copy rules →')),
     h('section', { class: 'blk' }, h('h4', {}, '2 · Bet spread ', h('small', {}, 'units bet at each true count')),
       h('div', { class: 'row', style: { marginBottom: '6px' } }, h('label', { class: 'u' }, '1 unit = $'), unitIn, spreadBtns), sp),
-    h('section', { class: 'blk' }, h('h4', {}, '3 · Your skill'),
+    h('section', { class: 'blk' }, h('h4', {}, '3 · Your skill'), sessNote,
       F({ path: 'player.deviations', label: 'Plays', type: 'select', options: [['none', 'Basic strategy only'], ['insurance', '+ insurance'], ['i18', '+ Illustrious 18'], ['i18fab4', '+ I18 & Fab 4'], ['full', '+ extended chart set'], ['engine', 'Everything (engine set)']] }),
       h('div', { class: 'two' }, slider('player.countErrorRate', 'Count slips / round', 20, 0.5, 'Chance each round your running count slips by ±1'),
         slider('player.mistakeRate', 'Wrong plays / decision', 20, 0.5, 'Chance you play the wrong move')),
@@ -108,6 +109,7 @@ export function mount(root, app) {
     const p = PRESETS.find((x) => x.id === c.preset);
     presetSel.title = p ? p.blurb : 'Custom rules';
     unitIn.value = c.spread.unit;
+    sessNote.hidden = !app.sessionNote; sessNote.textContent = app.sessionNote || '';
     const cur = app.evalCurrent();
     spIn.forEach((i, k) => { if (document.activeElement !== i) i.value = c.spread.bets[k]; });
     if (cur) spUsd.forEach((d, k) => { d.textContent = '$' + Math.round(cur.bets[Math.max(0, Math.min(NBINS - 1, k - TC_MIN))]); });
