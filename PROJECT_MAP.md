@@ -66,7 +66,7 @@ Whole dark theme (CSS variables at top), cards, forms, tables, strategy chart co
 ## `src/ui/` — browser UI
 | File | Purpose |
 |---|---|
-| `app.js` | Entry. Shared `app` state (config, persistence in localStorage + share link `#c=`), debounced `recompute()`. Home page = dashboard; every other module is a **tool** opened in a modal from the header **Tools ▾** menu (`TOOLS` list, `show(id)`, `show('home')` closes). |
+| `app.js` | Entry. Shared `app` state (config, persistence in localStorage + share link `#c=`), debounced `recompute()`. Home page = the 3D table; `openEV/closeEV` run the felt-zoom EV calculator; every detailed module is a **tool** opened in a modal from the EV calculator's **More tools** menu (`TOOLS` list, `show(id)`, `show('home')` closes). |
 | `dom.js` | `h()` element builder, number formatters, path helpers. |
 | `fields.js` | Declarative inputs bound to config paths (`makeField`, `card`). |
 | `charts.js` | Canvas line/band charts with hover, bar charts, histogram. |
